@@ -17,6 +17,7 @@
 
 #include "tinyos.h"
 #include "kernel_sched.h"
+#include "kernel_threads.h"//charge9
 
 /**
   @brief PID state
@@ -59,6 +60,10 @@ typedef struct process_control_block {
                              @c WaitChild() */
 
   FCB* FIDT[MAX_FILEID];  /**< @brief The fileid table of the process */
+
+
+  rlnode ptcb_list;
+  int thread_count;// charge9 was here |adding vital elements to connect pcb with ptcb structure
 
 } PCB;
 

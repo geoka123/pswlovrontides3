@@ -3,7 +3,7 @@
 #include "kernel_cc.h"
 #include "kernel_proc.h"
 #include "kernel_streams.h"
-
+#include "kernel_threads.h" //charge9
 
 /* 
  The process table and related system calls:
@@ -44,6 +44,9 @@ static inline void initialize_PCB(PCB* pcb)
   rlnode_init(& pcb->children_node, pcb);
   rlnode_init(& pcb->exited_node, pcb);
   pcb->child_exit = COND_INIT;
+
+  pcb->thread_count = 0; //initializing new variables for connecting pcb with ptcb //charge9
+  rlnode_init(& pcb->ptcb_list, NULL);
 }
 
 
@@ -178,7 +181,7 @@ Pid_t sys_Exec(Task call, int argl, void* args)
     the initialization of the PCB.
    */
   if(call != NULL) {
-    newproc->main_thread = spawn_thread(newproc, start_main_thread);
+    newproc->main_thread = spawn_thread(newproc, start_main_thread);// create ptcb t
     wakeup(newproc->main_thread);
   }
 

@@ -6,6 +6,7 @@
 #include "kernel_proc.h"
 #include "kernel_sched.h"
 #include "tinyos.h"
+#include "kernel_threads.h"//charge9
 
 #ifndef NVALGRIND
 #include <valgrind/valgrind.h>
@@ -150,11 +151,12 @@ static void thread_start()
   Initialize and return a new TCB
 */
 
-TCB* spawn_thread(PCB* pcb, void (*func)())
+TCB* spawn_thread(PCB* pcb, void (*func)(),PTCB* ptcb)
 {
+	
 	/* The allocated thread size must be a multiple of page size */
 	TCB* tcb = (TCB*)allocate_thread(THREAD_SIZE);
-
+	tcb->ptcb = ptcb;//initializing the new variable we added to connect ptcb with tcb //charge9
 	/* Set the owner */
 	tcb->owner_pcb = pcb;
 
