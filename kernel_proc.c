@@ -127,6 +127,20 @@ void start_main_thread()
   Exit(exitval);
 }
 
+void start_thread(){ 
+  int exitval;
+
+  TCB* CURTHREAD; //not quite sure about this one
+  CURTHREAD = cur_thread();
+
+  Task call = CURTHREAD->ptcb->task;
+  int argl = CURTHREAD->ptcb->argl;
+  void* args = CURTHREAD->ptcb>args;
+
+  exitval =call(argl,args);
+  ThreadExit(exitval);
+}
+
 
 /*
 	System call to create a new process.
