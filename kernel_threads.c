@@ -2,6 +2,7 @@
 #include "tinyos.h"
 #include "kernel_sched.h"
 #include "kernel_proc.h"
+#include "kernel_cc.h" // Bazo tin kernel_wait mesa
 
 void initialize_process_thread_control_block(PTCB* ptcb,TCB* tcb){
   ptcb->tcb = tcb;
@@ -36,8 +37,15 @@ PTCB* sys_ThreadSelf()
 /**
   @brief Join the given thread.
   */
-int sys_ThreadJoin(Tid_t tid, int* exitval)
+int sys_ThreadJoin(Tid_t tid, int* exitval) // Mounakia tin analamvanei o JETT aythn
 {
+  // ----- ELEGXOI POU PREPEI NA GINOUN EDO -----
+  // 1) An to dosmeno tid den yparxei
+  // 2) An to tid tis parametrou einai to tid tou thread poy kalei thn join
+  // 3) An to tid poy dinetai anikei se thread poy exei kanei detach
+  // 4) Ta 2 threads (auto poy kalei kai ayto pou kaleitai) na anikoun sto idio PCB
+
+  
 	return -1;
 }
 
@@ -52,7 +60,7 @@ int sys_ThreadDetach(Tid_t tid)
 /**
   @brief Terminate the current thread.
   */
-void sys_ThreadExit(int exitval)
+void sys_ThreadExit(int exitval) // Tzoutzouko pare aythn prwta giati ti xreiazomaste sthn join
 {
 
 }
