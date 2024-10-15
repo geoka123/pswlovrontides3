@@ -1,9 +1,6 @@
 # KANE MAS TON POUTSO PETRA giorgo kai vlasi kai Karavioti
 # ua mas fane thn zwh jinh
 
-
-
-
 # NAME
   help - How to get started building TinyOS 3
 

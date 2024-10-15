@@ -28,9 +28,9 @@ Tid_t sys_CreateThread(Task task, int argl, void* args)
 /**
   @brief Return the Tid of the current thread.
  */
-Tid_t sys_ThreadSelf()
+PTCB* sys_ThreadSelf()
 {
-	return (Tid_t) cur_thread();
+	return (PTCB*) ((Tid_t) cur_thread()); // Return PTCB better
 }
 
 /**
