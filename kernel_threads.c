@@ -46,8 +46,10 @@ int sys_ThreadJoin(Tid_t tid, int* exitval) // Mounakia tin analamvanei o JETT a
   // 4) Ta 2 threads (auto poy kalei kai ayto pou kaleitai) na anikoun sto idio PCB
 
   PTCB* cur_thread_ptcb = sys_ThreadSelf();
+  if (cur_thread_ptcb == ((PTCB*) tid) || (cur_thread_ptcb -> detached) == 1 || cur_thread_ptcb->tcb->owner_pcb == ((PTCB*) tid)->tcb->owner_pcb)
+    return -1; 
   kernel_wait(&(((PTCB*) tid) -> exit_cv), SCHED_MUTEX);  // Made current thread get into waiting list of the thread that exists as a parameter
-	return -1;
+	return 0;
 }
 
 /**
