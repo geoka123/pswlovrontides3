@@ -57,6 +57,8 @@ int sys_ThreadJoin(Tid_t tid, int* exitval) // Mounakia tin analamvanei o JETT a
   */
 int sys_ThreadDetach(Tid_t tid)
 {
+  //GIORGO DE NIWTHEIS NA XRISIMOPOIEIS GIT 
+  //KANE MAS TON POUTSO PETRA
 	return -1;
 }
 
