@@ -134,9 +134,11 @@ void start_main_thread()
 Pid_t sys_Exec(Task call, int argl, void* args)
 {
   PCB *curproc, *newproc;
+  PTCB *newptcb;
   
   /* The new process PCB */
   newproc = acquire_PCB();
+  newptcb = acquire_PTCB();
 
   if(newproc == NULL) goto finish;  /* We have run out of PIDs! */
 
@@ -174,14 +176,17 @@ Pid_t sys_Exec(Task call, int argl, void* args)
   }
   else
     newproc->args=NULL;
-
+ 
+  rlist_push_back(& newproc->ptcb_list,& newptcb->ptcb_list_node);
   /* 
+
     Create and wake up the thread for the main function. This must be the last thing
     we do, because once we wakeup the new thread it may run! so we need to have finished
     the initialization of the PCB.
    */
   if(call != NULL) {
     newproc->main_thread = spawn_thread(newproc, start_main_thread);// create ptcb t
+    newproc->thread_count++;
     wakeup(newproc->main_thread);
   }
 
@@ -304,30 +309,7 @@ void sys_Exit(int exitval)
 
     while(sys_WaitChild(NOPROC,NULL)!=NOPROC);
 
-  } else {
-
-    /* Reparent any children of the exiting process to the 
-       initial task */
-    PCB* initpcb = get_pcb(1);
-    while(!is_rlist_empty(& curproc->children_list)) {
-      rlnode* child = rlist_pop_front(& curproc->children_list);
-      child->pcb->parent = initpcb;
-      rlist_push_front(& initpcb->children_list, child);
-    }
-
-    /* Add exited children to the initial task's exited list 
-       and signal the initial task */
-    if(!is_rlist_empty(& curproc->exited_list)) {
-      rlist_append(& initpcb->exited_list, &curproc->exited_list);
-      kernel_broadcast(& initpcb->child_exit);
-    }
-
-    /* Put me into my parent's exited list */
-    rlist_push_front(& curproc->parent->exited_list, &curproc->exited_node);
-    kernel_broadcast(& curproc->parent->child_exit);
-
-  }
-
+  } 
   assert(is_rlist_empty(& curproc->children_list));
   assert(is_rlist_empty(& curproc->exited_list));
 
@@ -356,8 +338,6 @@ void sys_Exit(int exitval)
   /* Now, mark the process as exited. */
   curproc->pstate = ZOMBIE;
 
-  /* Bye-bye cruel world */
-  kernel_sleep(EXITED, SCHED_USER);
 }
 
 
