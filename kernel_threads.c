@@ -15,13 +15,12 @@ void initialize_process_thread_control_block(PTCB* ptcb){
   ptcb->exit_cv = COND_INIT;
   ptcb->refcount = 0;
 
-  rlnode_init(& ptcb->ptcb_list_node ,NULL);
+  rlnode_init(& ptcb->ptcb_list_node ,ptcb);
   
 }
 
-PTCB* acquire_PTCB()
-{
-  PTCB* ptcb = NULL;
+PTCB* acquire_PTCB(){
+  PTCB *ptcb = NULL;
 
   ptcb = xmalloc(sizeof(PTCB));
 
@@ -59,23 +58,39 @@ void start_thread(){
 Tid_t sys_CreateThread(Task task, int argl, void* args)
 {   
   PTCB*  newptcb;
-  newptcb = acquire_PTCB();
-  initialize_process_thread_control_block(newptcb);
-  newptcb->task = task;
+ // newptcb = acquire_PTCB();
+  //initialize_process_thread_control_block(newptcb);
+  //if(task != NULL){
+  newptcb = xmalloc(sizeof(PTCB));
+  newptcb->tcb = spawn_thread(CURPROC, start_thread);
 
+
+  newptcb->tcb->ptcb = newptcb;
+  
+
+
+  newptcb->task = task;
   newptcb->argl = argl;
   newptcb->args = args;
 
-  list_push_back(& CURPROC->ptcb_list,& newptcb->ptcb_list_node);
-  if(task != NULL) {
-    newptcb->tcb = spawn_thread(CURPROC, start_thread);
+  newptcb->exited = 0;
+  newptcb->detached = 0;
+  newptcb->exit_cv = COND_INIT;
+  newptcb->refcount = 0;
+  //if(task != NULL) {
 
-    newptcb->tcb->owner_pcb = CURPROC;//linking ptcb with thread
-    newptcb->tcb->owner_pcb->thread_count++;//increasing thread count
-    newptcb->tcb->ptcb = newptcb;
-    wakeup(newptcb->tcb);
-  }
-	return (Tid_t)newptcb;
+  rlnode_init(& newptcb->ptcb_list_node ,newptcb);
+    
+
+  rlist_push_back(& CURPROC->ptcb_list,& newptcb->ptcb_list_node);
+  
+  CURPROC->thread_count++;//increasing thread count
+
+  wakeup(newptcb->tcb);
+  return (Tid_t)newptcb;
+  //}
+  //return NOTHREAD;  
+	
 }
 
 /**
@@ -113,16 +128,18 @@ int sys_ThreadJoin(Tid_t tid, int* exitval) //
   while (cur_thread_ptcb->exited == 0 && cur_thread_ptcb->detached == 0)      //while thread not detached and not exited
     kernel_wait(&(((PTCB*) tid) -> exit_cv), SCHED_USER);    // Made current thread get into waiting list of the thread that exists as a parameter
   
+  
+
   if (thread_to_join_in->detached == 1) //return -1 if t2 was detached
     return -1;
   
   if (exitval != NULL)    // if exit val is not null *exit_val == ptcb->*exit_val
     cur_thread_ptcb->exitval = *exitval;
   
-  cur_thread_ptcb->refcount--;    // refcount--
+    cur_thread_ptcb->refcount--;    // refcount--
   if (cur_thread_ptcb->refcount == 0)      // if refcount == 0 then remove ptcb from curproc
     rlist_remove(&(cur_thread_ptcb->ptcb_list_node));
-
+    free(cur_thread_ptcb);
 	return 0;
 }
 
@@ -162,9 +179,11 @@ void sys_ThreadExit(int exitval){
   
   ptcb->exitval = exitval;
   ptcb->exited = 1;
+  curproc->thread_count--;
+  kernel_broadcast(&(ptcb->exit_cv));
 
-  if(curproc->thread_count==1){
-    if(get_pid(curproc)==1){
+  if(curproc->thread_count==0){
+    if(get_pid(curproc)!=1){
       PCB* initpcb = get_pcb(1);
       while(!is_rlist_empty(& curproc->children_list)) {
         rlnode* child = rlist_pop_front(& curproc->children_list);
@@ -212,7 +231,7 @@ void sys_ThreadExit(int exitval){
 
     /* Now, mark the process as exited. */
     curproc->pstate = ZOMBIE;
-    
+    //osa threads den exoyn ginei join apo alla oste na sbhstei to ptcb toys mesa sthn join tha prepei na sbh
   
   }
   kernel_sleep(EXITED, SCHED_USER);
