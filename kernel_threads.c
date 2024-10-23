@@ -12,7 +12,7 @@ void initialize_process_thread_control_block(PTCB* ptcb,TCB* tcb){
   ptcb->exitval = 0;
   ptcb->exited = 0;
   ptcb->detached = 0;
-  CondVar_init(& ptcb->exit_cv,NULL);
+  ptcb->exit_cv = COND_INIT;
   ptcb->refcount = 0;
 
   rlnode_init(& ptcb->ptcb_list_node ,NULL);
@@ -68,11 +68,11 @@ int sys_ThreadJoin(Tid_t tid, int* exitval) //
     return -1;
   
   if (exitval != NULL)    // if exit val is not null *exit_val == ptcb->*exit_val
-    cur_thread_ptcb->exitval == &exitval;
+    cur_thread_ptcb->exitval = *exitval;
   
   cur_thread_ptcb->refcount--;    // refcount--
   if (cur_thread_ptcb->refcount == 0)      // if refcount == 0 then remove ptcb from curproc
-    rlist_remove(cur_thread_ptcb);
+    rlist_remove(&(cur_thread_ptcb->ptcb_list_node));
 
 	return 0;
 }
@@ -96,7 +96,7 @@ int sys_ThreadDetach(Tid_t tid)
   if (rlist_find(&(parent_pcb->ptcb_list), &(ptcb_of_thread->ptcb_list_node), NULL) == NULL)    // Checking if the given tid actually exists
     return -1;
 
-  ptcb_of_thread->detached == 1;    // Making the tid detached
+  ptcb_of_thread->detached = 1;    // Making the tid detached
   kernel_broadcast(&(ptcb_of_thread->exit_cv));    // Waking up all the waiting threads and telling them that they aint gonna join it
 
 	return 0;
