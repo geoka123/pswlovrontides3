@@ -134,11 +134,11 @@ void start_main_thread()
 Pid_t sys_Exec(Task call, int argl, void* args)
 {
   PCB *curproc, *newproc;
-  PTCB *newptcb;
+  
   
   /* The new process PCB */
   newproc = acquire_PCB();
-  newptcb = acquire_PTCB();
+ 
 
   if(newproc == NULL) goto finish;  /* We have run out of PIDs! */
 
@@ -177,7 +177,7 @@ Pid_t sys_Exec(Task call, int argl, void* args)
   else
     newproc->args=NULL;
  
-  rlist_push_back(& newproc->ptcb_list,& newptcb->ptcb_list_node);
+
   /* 
 
     Create and wake up the thread for the main function. This must be the last thing
@@ -186,6 +186,26 @@ Pid_t sys_Exec(Task call, int argl, void* args)
    */
   if(call != NULL) {
     newproc->main_thread = spawn_thread(newproc, start_main_thread);// create ptcb t
+    PTCB *ptcb;
+    //newptcb = acquire_PTCB();
+    ptcb = xmalloc(sizeof(PTCB));
+  
+    ptcb->task = newproc->main_task;
+    ptcb->argl=newproc->argl;
+    ptcb->args = newproc->args;
+    //initialize_process_thread_control_block(newptcb);
+    ptcb->exited = 0;
+    ptcb->detached = 0;
+    ptcb->exit_cv = COND_INIT;
+    ptcb->refcount = 0;
+
+
+
+    ptcb->tcb = newproc->main_thread;
+    newproc->main_thread->ptcb = ptcb;
+
+    rlnode_init(& ptcb->ptcb_list_node ,ptcb);
+    rlist_push_back(& newproc->ptcb_list,& ptcb->ptcb_list_node);
     newproc->thread_count++;
     wakeup(newproc->main_thread);
   }
@@ -310,33 +330,7 @@ void sys_Exit(int exitval)
     while(sys_WaitChild(NOPROC,NULL)!=NOPROC);
 
   } 
-  assert(is_rlist_empty(& curproc->children_list));
-  assert(is_rlist_empty(& curproc->exited_list));
-
-
-  /* 
-    Do all the other cleanup we want here, close files etc. 
-   */
-
-  /* Release the args data */
-  if(curproc->args) {
-    free(curproc->args);
-    curproc->args = NULL;
-  }
-
-  /* Clean up FIDT */
-  for(int i=0;i<MAX_FILEID;i++) {
-    if(curproc->FIDT[i] != NULL) {
-      FCB_decref(curproc->FIDT[i]);
-      curproc->FIDT[i] = NULL;
-    }
-  }
-
-  /* Disconnect my main_thread */
-  curproc->main_thread = NULL;
-
-  /* Now, mark the process as exited. */
-  curproc->pstate = ZOMBIE;
+  sys_ThreadExit(exitval);
 
 }
 
