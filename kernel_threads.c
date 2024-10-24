@@ -121,6 +121,8 @@ int sys_ThreadJoin(Tid_t tid, int* exitval) //
     return -1;
   if (cur_thread_ptcb == ((PTCB*) tid) || (cur_thread_ptcb -> detached) == 1 || cur_thread_ptcb->tcb->owner_pcb == ((PTCB*) tid)->tcb->owner_pcb)
     return -1; 
+  if (tid == NOTHREAD)
+    return -1;
   
   // ----- TESTS PASSED -----
   cur_thread_ptcb->refcount++; // refcount++
@@ -159,7 +161,16 @@ int sys_ThreadDetach(Tid_t tid)
   if (ptcb_of_thread->exited == 1)   // Check if the given tid corresponds to an exited thread
     return -1;
   
-  if (rlist_find(&(parent_pcb->ptcb_list), &(ptcb_of_thread->ptcb_list_node), NULL) == NULL)    // Checking if the given tid actually exists
+  if (rlist_find(& parent_pcb->ptcb_list, ptcb_of_thread, NULL) == NULL)    // Checking if the given tid actually exists
+    return -1;
+  
+  if (ptcb_of_thread == cur_thread()->ptcb)
+    return 0;
+  
+  if (tid == NOTHREAD)
+    return -1;
+  
+  if (parent_pcb->thread_count == 1)
     return -1;
 
   ptcb_of_thread->detached = 1;    // Making the tid detached
