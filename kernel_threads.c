@@ -66,7 +66,7 @@ Tid_t sys_CreateThread(Task task, int argl, void* args)
   newptcb->argl = argl;
   newptcb->args = args;
 
-  list_push_back(& CURPROC->ptcb_list,& newptcb->ptcb_list_node);
+  rlist_push_back(&(CURPROC->ptcb_list),&(newptcb->ptcb_list_node));
   if(task != NULL) {
     newptcb->tcb = spawn_thread(CURPROC, start_thread);
 
@@ -107,10 +107,11 @@ int sys_ThreadJoin(Tid_t tid, int* exitval) //
   if (cur_thread_ptcb == ((PTCB*) tid) || (cur_thread_ptcb -> detached) == 1 || cur_thread_ptcb->tcb->owner_pcb == ((PTCB*) tid)->tcb->owner_pcb)
     return -1; 
   
+  printf("---------- TESTS FOR JOIN PASSED ----------");
   // ----- TESTS PASSED -----
   cur_thread_ptcb->refcount++; // refcount++
 
-  while (cur_thread_ptcb->exited == 0 && cur_thread_ptcb->detached == 0)      //while thread not detached and not exited
+  while (thread_to_join_in->exited == 0 && thread_to_join_in->detached == 0)      //while thread not detached and not exited
     kernel_wait(&(((PTCB*) tid) -> exit_cv), SCHED_USER);    // Made current thread get into waiting list of the thread that exists as a parameter
   
   if (thread_to_join_in->detached == 1) //return -1 if t2 was detached

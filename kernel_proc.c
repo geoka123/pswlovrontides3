@@ -177,7 +177,7 @@ Pid_t sys_Exec(Task call, int argl, void* args)
   else
     newproc->args=NULL;
  
-  rlist_push_back(& newproc->ptcb_list,& newptcb->ptcb_list_node);
+  rlist_push_back(& (newproc->ptcb_list),& (newptcb->ptcb_list_node));
   /* 
 
     Create and wake up the thread for the main function. This must be the last thing
