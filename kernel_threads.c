@@ -66,7 +66,7 @@ Tid_t sys_CreateThread(Task task, int argl, void* args)
   newptcb->argl = argl;
   newptcb->args = args;
 
-  rlist_push_back(&(CURPROC->ptcb_list),&(newptcb->ptcb_list_node));
+  rlist_push_back(& CURPROC->ptcb_list, & newptcb->ptcb_list_node);
   if(task != NULL) {
     newptcb->tcb = spawn_thread(CURPROC, start_thread);
 
