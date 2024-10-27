@@ -98,7 +98,7 @@ Tid_t sys_CreateThread(Task task, int argl, void* args)
  */
 Tid_t sys_ThreadSelf()
 {
-	return (Tid_t) cur_thread()->ptcb ; // Return PTCB better
+	return (Tid_t) (cur_thread()->ptcb); // Return PTCB better
 }
 
 /**
@@ -113,7 +113,7 @@ int sys_ThreadJoin(Tid_t tid, int* exitval) //
   // 4) Ta 2 threads (auto poy kalei kai ayto pou kaleitai) na anikoun sto idio PCB
 
   PTCB* thread_to_join_in = (PTCB*) tid;
-  PTCB* cur_thread_ptcb = (PTCB*) cur_thread();
+  PTCB* cur_thread_ptcb = cur_thread()->ptcb;
 
   // ----- TESTS INIT -----
   if (rlist_find(&(CURPROC->ptcb_list), thread_to_join_in, NULL) == NULL)
@@ -134,7 +134,7 @@ int sys_ThreadJoin(Tid_t tid, int* exitval) //
   if (thread_to_join_in->detached == 1) //return -1 if t2 was detached
     return -1;
   
-  if (exitval != NULL && exitval >= 0)    // if exit val is not null *exit_val == ptcb->*exit_val
+  if (exitval != NULL)    // if exit val is not null *exit_val == ptcb->*exit_val
     thread_to_join_in->exitval = *exitval;
   
   cur_thread_ptcb->refcount--;    // refcount--
