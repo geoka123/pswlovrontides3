@@ -98,7 +98,7 @@ Tid_t sys_CreateThread(Task task, int argl, void* args)
  */
 Tid_t sys_ThreadSelf()
 {
-	return (Tid_t) cur_thread()->ptcb ; // Return PTCB better
+	return (Tid_t) (cur_thread()->ptcb); // Return PTCB better
 }
 
 /**
@@ -112,14 +112,13 @@ int sys_ThreadJoin(Tid_t tid, int* exitval) //
   // 3) An to tid poy dinetai anikei se thread poy exei kanei detach
   // 4) Ta 2 threads (auto poy kalei kai ayto pou kaleitai) na anikoun sto idio PCB
 
-  PTCB* cur_thread_ptcb = (PTCB*) sys_ThreadSelf();
   PTCB* thread_to_join_in = (PTCB*) tid;
-  PCB* parent_pcb = cur_thread_ptcb->tcb->owner_pcb;
+  PTCB* cur_thread_ptcb = cur_thread()->ptcb;
 
   // ----- TESTS INIT -----
-  if (rlist_find(&(parent_pcb->ptcb_list), &(cur_thread_ptcb->ptcb_list_node), NULL) == NULL)
+  if (rlist_find(&(CURPROC->ptcb_list), thread_to_join_in, NULL) == NULL)
     return -1;
-  if (cur_thread_ptcb == ((PTCB*) tid) || (cur_thread_ptcb -> detached) == 1 || cur_thread_ptcb->tcb->owner_pcb == ((PTCB*) tid)->tcb->owner_pcb)
+  if (cur_thread_ptcb == thread_to_join_in || thread_to_join_in->detached == 1 || cur_thread_ptcb->detached == 1)
     return -1; 
   if (tid == NOTHREAD)
     return -1;
@@ -136,12 +135,11 @@ int sys_ThreadJoin(Tid_t tid, int* exitval) //
     return -1;
   
   if (exitval != NULL)    // if exit val is not null *exit_val == ptcb->*exit_val
-    cur_thread_ptcb->exitval = *exitval;
+    thread_to_join_in->exitval = *exitval;
   
-    cur_thread_ptcb->refcount--;    // refcount--
+  cur_thread_ptcb->refcount--;    // refcount--
   if (cur_thread_ptcb->refcount == 0)      // if refcount == 0 then remove ptcb from curproc
-    rlist_remove(&(cur_thread_ptcb->ptcb_list_node));
-    free(cur_thread_ptcb);
+    rlist_remove(&(cur_thread_ptcb));
 	return 0;
 }
 
@@ -154,14 +152,15 @@ int sys_ThreadDetach(Tid_t tid)
   // kanw ta testakia poy grafei sto brief toy tinyos.h
   // prosexe gia tin rlist_find
   // ama perasoun ola ta testakia kane broadcast
-  
+
   PTCB* ptcb_of_thread = (PTCB*) tid;
+
+  if ( rlist_find(& CURPROC->ptcb_list, ptcb_of_thread, NULL) == NULL)
+    return -1;
+
   PCB* parent_pcb = ptcb_of_thread->tcb->owner_pcb;
 
   if (ptcb_of_thread->exited == 1)   // Check if the given tid corresponds to an exited thread
-    return -1;
-  
-  if (rlist_find(& parent_pcb->ptcb_list, ptcb_of_thread, NULL) == NULL)    // Checking if the given tid actually exists
     return -1;
   
   if (ptcb_of_thread == cur_thread()->ptcb)
