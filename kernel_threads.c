@@ -113,7 +113,7 @@ int sys_ThreadJoin(Tid_t tid, int* exitval) //
   // 4) Ta 2 threads (auto poy kalei kai ayto pou kaleitai) na anikoun sto idio PCB
 
   PTCB* thread_to_join_in = (PTCB*) tid;
-  PTCB* cur_thread_ptcb = cur_thread()->ptcb;
+  PTCB* cur_thread_ptcb = (PTCB*) sys_ThreadSelf();
 
   // ----- TESTS INIT -----
   if (rlist_find(&(CURPROC->ptcb_list), thread_to_join_in, NULL) == NULL)
@@ -126,11 +126,9 @@ int sys_ThreadJoin(Tid_t tid, int* exitval) //
   // ----- TESTS PASSED -----
   cur_thread_ptcb->refcount++; // refcount++
 
-  while (cur_thread_ptcb->exited == 0 && cur_thread_ptcb->detached == 0)      //while thread not detached and not exited
-    kernel_wait(&(((PTCB*) tid) -> exit_cv), SCHED_USER);    // Made current thread get into waiting list of the thread that exists as a parameter
+  while (thread_to_join_in->exited == 0 && thread_to_join_in->detached == 0)      //while thread not detached and not exited
+    kernel_wait(&(thread_to_join_in -> exit_cv), SCHED_USER);    // Made current thread get into waiting list of the thread that exists as a parameter
   
-  
-
   if (thread_to_join_in->detached == 1) //return -1 if t2 was detached
     return -1;
   
@@ -139,7 +137,7 @@ int sys_ThreadJoin(Tid_t tid, int* exitval) //
   
   cur_thread_ptcb->refcount--;    // refcount--
   if (cur_thread_ptcb->refcount == 0)      // if refcount == 0 then remove ptcb from curproc
-    rlist_remove(&(cur_thread_ptcb));
+    rlist_remove(& cur_thread_ptcb->ptcb_list_node);
 	return 0;
 }
 
@@ -158,8 +156,6 @@ int sys_ThreadDetach(Tid_t tid)
   if ( rlist_find(& CURPROC->ptcb_list, ptcb_of_thread, NULL) == NULL)
     return -1;
 
-  PCB* parent_pcb = ptcb_of_thread->tcb->owner_pcb;
-
   if (ptcb_of_thread->exited == 1)   // Check if the given tid corresponds to an exited thread
     return -1;
   
@@ -169,7 +165,7 @@ int sys_ThreadDetach(Tid_t tid)
   if (tid == NOTHREAD)
     return -1;
   
-  if (parent_pcb->thread_count == 1)
+  if (CURPROC->thread_count == 1)
     return -1;
 
   ptcb_of_thread->detached = 1;    // Making the tid detached
