@@ -104,42 +104,40 @@ Tid_t sys_ThreadSelf()
 /**
   @brief Join the given thread.
   */
-int sys_ThreadJoin(Tid_t tid, int* exitval) //
-{
-  // ----- ELEGXOI POU PREPEI NA GINOUN EDO -----
-  // 1) An to dosmeno tid den yparxei  apo listapcb arrlist_find
-  // 2) An to tid tis parametrou einai to tid tou thread poy kalei thn join
-  // 3) An to tid poy dinetai anikei se thread poy exei kanei detach
-  // 4) Ta 2 threads (auto poy kalei kai ayto pou kaleitai) na anikoun sto idio PCB
+int sys_ThreadJoin(Tid_t tid, int* exitval) {
+    // ----- TESTS INIT -----
+    PTCB* thread_to_join_in = (PTCB*) tid;
+    PTCB* cur_thread_ptcb = (PTCB*) sys_ThreadSelf();
 
-  PTCB* thread_to_join_in = (PTCB*) tid;
-  PTCB* cur_thread_ptcb = (PTCB*) sys_ThreadSelf();
+    if (rlist_find(&(CURPROC->ptcb_list), thread_to_join_in, NULL) == NULL)
+        return -1;
+    if (cur_thread_ptcb == thread_to_join_in || thread_to_join_in->detached == 1 || cur_thread_ptcb->detached == 1)
+        return -1;
+    if (tid == NOTHREAD)
+        return -1;
 
-  // ----- TESTS INIT -----
-  if (rlist_find(&(CURPROC->ptcb_list), thread_to_join_in, NULL) == NULL)
-    return -1;
-  if (cur_thread_ptcb == thread_to_join_in || thread_to_join_in->detached == 1 || cur_thread_ptcb->detached == 1)
-    return -1; 
-  if (tid == NOTHREAD)
-    return -1;
-  
-  // ----- TESTS PASSED -----
-  cur_thread_ptcb->refcount++; // refcount++
+    // ----- TESTS PASSED -----
+    thread_to_join_in->refcount++;  // refcount++
 
-  while (thread_to_join_in->exited == 0 && thread_to_join_in->detached == 0)      //while thread not detached and not exited
-    kernel_wait(&(thread_to_join_in -> exit_cv), SCHED_USER);    // Made current thread get into waiting list of the thread that exists as a parameter
-  
-  if (thread_to_join_in->detached == 1) //return -1 if t2 was detached
-    return -1;
-  
-  if (exitval != NULL)    // if exit val is not null *exit_val == ptcb->*exit_val
-    thread_to_join_in->exitval = *exitval;
-  
-  cur_thread_ptcb->refcount--;    // refcount--
-  if (cur_thread_ptcb->refcount == 0)      // if refcount == 0 then remove ptcb from curproc
-    rlist_remove(& cur_thread_ptcb->ptcb_list_node);
-	return 0;
+    while (thread_to_join_in->exited == 0 && thread_to_join_in->detached == 0)
+        kernel_wait(&(thread_to_join_in->exit_cv), SCHED_USER);
+
+    if (thread_to_join_in->detached == 1) {
+        thread_to_join_in->refcount--;  // Adjust refcount if detached
+        return -1;
+    }
+
+    if (exitval != NULL) {
+        *exitval = thread_to_join_in->exitval;  // Return thread exit value
+    }
+
+    thread_to_join_in->refcount--;  // refcount--
+    if (thread_to_join_in->refcount == 0) {
+        rlist_remove(&thread_to_join_in->ptcb_list_node);  // Clean up if no refs
+    }
+    return 0;
 }
+
 
 /**
   @brief Detach the given thread.
