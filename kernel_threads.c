@@ -110,11 +110,11 @@ int sys_ThreadJoin(Tid_t tid, int* exitval) {
     PTCB* cur_thread_ptcb = (PTCB*) sys_ThreadSelf();
 
     if (rlist_find(&(CURPROC->ptcb_list), thread_to_join_in, NULL) == NULL)
-        return -1;
-    if (cur_thread_ptcb == thread_to_join_in || thread_to_join_in->detached == 1 || cur_thread_ptcb->detached == 1)
-        return -1;
+      return -1;
+    if (cur_thread_ptcb == thread_to_join_in || thread_to_join_in->detached == 1)
+      return -1;
     if (tid == NOTHREAD)
-        return -1;
+      return -1;
 
     // ----- TESTS PASSED -----
     thread_to_join_in->refcount++;  // refcount++
@@ -157,8 +157,11 @@ int sys_ThreadDetach(Tid_t tid)
   if (ptcb_of_thread->exited == 1)   // Check if the given tid corresponds to an exited thread
     return -1;
   
-  if (ptcb_of_thread == cur_thread()->ptcb)
+  if (ptcb_of_thread == cur_thread()->ptcb){
+    ptcb_of_thread->detached = 1;    // Making the tid detached
+    kernel_broadcast(&(ptcb_of_thread->exit_cv));
     return 0;
+  }
   
   if (tid == NOTHREAD)
     return -1;
