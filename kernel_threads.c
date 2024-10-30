@@ -233,6 +233,17 @@ void sys_ThreadExit(int exitval){
       }
     }
 
+    // CLEAN UP REMAINING PTCBS
+    rlnode* ptcb_list_in_proc = &CURPROC->ptcb_list;
+    for (int i=0; i<=rlist_len(ptcb_list_in_proc); i++) {
+      rlnode* temp_node = ptcb_list_in_proc;
+      // if (is_rlist_empty(ptcb_list_in_proc) == 1)
+      //   break;
+      if (&temp_node->ptcb->refcount == 0)
+        rlist_remove(&temp_node->ptcb->ptcb_list_node);
+      temp_node = temp_node->next;
+    }
+
     /* Disconnect my main_thread */
     curproc->main_thread = NULL;
 
