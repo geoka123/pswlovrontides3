@@ -331,23 +331,22 @@ static void sched_wakeup_expired_timeouts()
 */
 static TCB* sched_queue_select(TCB* current)
 {
-	TCB* next_thread;
-	rlnode* sel;
+	TCB* next_thread = NULL;
+	rlnode* sel = NULL;
 	/* Get the head of the SCHED list */
 	for(int i = 0; i < PRIORITY_QUEUES;i++){
-		if(is_rlist_empty(&SCHED[i])!= 1){
+		if(is_rlist_empty(&SCHED[i])== 0){
 			sel = rlist_pop_front(&SCHED[i]);
 			
 			next_thread = sel->tcb; /* When the list is empty, this is NULL */
 
-			if (next_thread == NULL)
-				next_thread = (current->state == READY) ? current : &CURCORE.idle_thread;
-
-			next_thread->its = QUANTUM;
 			break;
 		}
 	}
+	if (next_thread == NULL)
+		next_thread = (current->state == READY) ? current : &CURCORE.idle_thread;
 
+	next_thread->its = QUANTUM;
 	return next_thread;	
 }
 
