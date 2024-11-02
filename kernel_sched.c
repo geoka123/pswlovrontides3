@@ -173,6 +173,8 @@ TCB* spawn_thread(PCB* pcb, void (*func)())
 	tcb->last_cause = SCHED_IDLE;
 	tcb->curr_cause = SCHED_IDLE;
 
+	tcb->priority = 5;
+
 	/* Compute the stack segment address and size */
 	void* sp = ((void*)tcb) + THREAD_TCB_SIZE;
 
@@ -271,7 +273,7 @@ static void sched_register_timeout(TCB* tcb, TimerDuration timeout)
 static void sched_queue_add(TCB* tcb)
 {
 	/* Insert at the end of the scheduling list */
-	rlist_push_back(&SCHED, &tcb->sched_node);
+	rlist_push_back(&SCHED[tcb->priority], &tcb->sched_node);
 
 	/* Restart possibly halted cores */
 	cpu_core_restart_one();
@@ -329,17 +331,24 @@ static void sched_wakeup_expired_timeouts()
 */
 static TCB* sched_queue_select(TCB* current)
 {
+	TCB* next_thread;
+	rlnode* sel;
 	/* Get the head of the SCHED list */
-	rlnode* sel = rlist_pop_front(&SCHED);
+	for(int i = 0; i < PRIORITY_QUEUES;i++){
+		if(is_rlist_empty(&SCHED[i])!= 1){
+			sel = rlist_pop_front(&SCHED[i]);
+			
+			next_thread = sel->tcb; /* When the list is empty, this is NULL */
 
-	TCB* next_thread = sel->tcb; /* When the list is empty, this is NULL */
+			if (next_thread == NULL)
+				next_thread = (current->state == READY) ? current : &CURCORE.idle_thread;
 
-	if (next_thread == NULL)
-		next_thread = (current->state == READY) ? current : &CURCORE.idle_thread;
+			next_thread->its = QUANTUM;
+			break;
+		}
+	}
 
-	next_thread->its = QUANTUM;
-
-	return next_thread;
+	return next_thread;	
 }
 
 /*
@@ -524,7 +533,9 @@ static void idle_thread()
  */
 void initialize_scheduler()
 {
-	rlnode_init(&SCHED, NULL);
+	for(int i = 0;i<PRIORITY_QUEUES;i++){
+		rlnode_init(&SCHED[i], NULL);
+	}		
 	rlnode_init(&TIMEOUT_LIST, NULL);
 }
 
