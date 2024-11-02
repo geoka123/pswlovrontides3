@@ -334,7 +334,7 @@ static TCB* sched_queue_select(TCB* current)
 	TCB* next_thread = NULL;
 	rlnode* sel = NULL;
 	/* Get the head of the SCHED list */
-	for(int i = 0; i < PRIORITY_QUEUES;i++){
+	for(int i = PRIORITY_QUEUES-1; i >= 0;i--){
 		if(is_rlist_empty(&SCHED[i])== 0){
 			sel = rlist_pop_front(&SCHED[i]);
 			
@@ -427,6 +427,21 @@ void yield(enum SCHED_CAUSE cause)
 	Mutex_Lock(&sched_spinlock);
 
 	/* Update CURTHREAD state */
+	switch (cause){
+		case SCHED_QUANTUM :
+			if(current->priority >0){
+				current->priority--;
+			}
+			break;
+		case SCHED_IO :
+			if(current->priority < 9 ){
+				current->priority++;
+			}
+			break;
+	}
+	
+
+
 	if (current->state == RUNNING)
 		current->state = READY;
 
