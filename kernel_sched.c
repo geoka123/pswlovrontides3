@@ -28,6 +28,7 @@ CCB cctx[MAX_CORES];
 	non-preemtpive context.
  */
 #define CURCORE (cctx[cpu_core_id])
+#define PRIORITY_QUEUES 10
 
 /* 
 	The current thread. This is a pointer to the TCB of the thread 
@@ -86,6 +87,7 @@ TCB* cur_thread()
 volatile unsigned int active_threads = 0;
 Mutex active_threads_spinlock = MUTEX_INIT;
 
+static int yield_counter = 0;
 /* This is specific to Intel Pentium! */
 #define SYSTEM_PAGE_SIZE (1 << 12)
 
@@ -173,7 +175,7 @@ TCB* spawn_thread(PCB* pcb, void (*func)())
 	tcb->last_cause = SCHED_IDLE;
 	tcb->curr_cause = SCHED_IDLE;
 
-	tcb->priority = 5;
+	tcb->priority = (PRIORITY_QUEUES/2 )- 1;
 
 	/* Compute the stack segment address and size */
 	void* sp = ((void*)tcb) + THREAD_TCB_SIZE;
@@ -228,7 +230,7 @@ void release_TCB(TCB* tcb)
 
   Both of these structures are protected by @c sched_spinlock.
 */
-#define PRIORITY_QUEUES 10
+
 
 rlnode SCHED[PRIORITY_QUEUES];
 rlnode TIMEOUT_LIST; /* The list of threads with a timeout */
@@ -426,20 +428,41 @@ void yield(enum SCHED_CAUSE cause)
 
 	Mutex_Lock(&sched_spinlock);
 
+
 	/* Update CURTHREAD state */
 	switch (cause){
 		case SCHED_QUANTUM :
-			if(current->priority >0){
+			if(current->priority > 0){
 				current->priority--;
 			}
 			break;
 		case SCHED_IO :
-			if(current->priority < 9 ){
+			if(current->priority < PRIORITY_QUEUES -1 ){
 				current->priority++;
 			}
 			break;
+		case SCHED_MUTEX:
+			if(current->priority > 0 && current->last_cause == cause){
+				current->priority--;
+			}
+			break;
+		default:
+			break;
 	}
-	
+
+
+	yield_counter++;
+	if(yield_counter==50){
+		yield_counter = 0;
+		for(int i = PRIORITY_QUEUES-2; i > 0;i--){
+			while(is_rlist_empty(&SCHED[i])==0){
+				rlnode* to_be_inserted = rlist_pop_front(&SCHED[i]);
+				to_be_inserted->tcb->priority++;
+				rlist_push_back(&SCHED[i+1],to_be_inserted);
+			} 
+		}
+	}
+
 
 
 	if (current->state == RUNNING)
@@ -459,6 +482,8 @@ void yield(enum SCHED_CAUSE cause)
 
 	/* Save the current TCB for the gain phase */
 	CURCORE.previous_thread = current;
+
+
 
 	Mutex_Unlock(&sched_spinlock);
 
