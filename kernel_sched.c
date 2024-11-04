@@ -29,6 +29,7 @@ CCB cctx[MAX_CORES];
  */
 #define CURCORE (cctx[cpu_core_id])
 #define PRIORITY_QUEUES 10
+static int yield_counter = 0;
 
 /* 
 	The current thread. This is a pointer to the TCB of the thread 
@@ -87,7 +88,7 @@ TCB* cur_thread()
 volatile unsigned int active_threads = 0;
 Mutex active_threads_spinlock = MUTEX_INIT;
 
-static int yield_counter = 0;
+
 /* This is specific to Intel Pentium! */
 #define SYSTEM_PAGE_SIZE (1 << 12)
 
@@ -175,7 +176,7 @@ TCB* spawn_thread(PCB* pcb, void (*func)())
 	tcb->last_cause = SCHED_IDLE;
 	tcb->curr_cause = SCHED_IDLE;
 
-	tcb->priority = (PRIORITY_QUEUES/2 )- 1;
+	tcb->priority = (PRIORITY_QUEUES/2 ) -1 ;
 
 	/* Compute the stack segment address and size */
 	void* sp = ((void*)tcb) + THREAD_TCB_SIZE;
@@ -428,7 +429,7 @@ void yield(enum SCHED_CAUSE cause)
 
 	Mutex_Lock(&sched_spinlock);
 
-
+	yield_counter++;
 	/* Update CURTHREAD state */
 	switch (cause){
 		case SCHED_QUANTUM :
@@ -451,19 +452,18 @@ void yield(enum SCHED_CAUSE cause)
 	}
 
 
-	yield_counter++;
+	
 	if(yield_counter==50){
+		rlnode* to_be_inserted;
 		yield_counter = 0;
-		for(int i = PRIORITY_QUEUES-2; i > 0;i--){
-			while(is_rlist_empty(&SCHED[i])==0){
-				rlnode* to_be_inserted = rlist_pop_front(&SCHED[i]);
+		for(int i = PRIORITY_QUEUES-2; i >= 0;i--){
+			while(!is_rlist_empty(&SCHED[i])){
+				to_be_inserted = rlist_pop_front(&SCHED[i]);
 				to_be_inserted->tcb->priority++;
 				rlist_push_back(&SCHED[i+1],to_be_inserted);
 			} 
 		}
 	}
-
-
 
 	if (current->state == RUNNING)
 		current->state = READY;
