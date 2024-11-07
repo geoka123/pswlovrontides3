@@ -28,7 +28,7 @@ CCB cctx[MAX_CORES];
 	non-preemtpive context.
  */
 #define CURCORE (cctx[cpu_core_id])
-#define PRIORITY_QUEUES 10
+#define PRIORITY_QUEUES 32
 static int yield_counter = 0;
 
 /* 
@@ -175,7 +175,8 @@ TCB* spawn_thread(PCB* pcb, void (*func)())
 	tcb->rts = QUANTUM;
 	tcb->last_cause = SCHED_IDLE;
 	tcb->curr_cause = SCHED_IDLE;
-
+	//tcb->priority = (3*(PRIORITY_QUEUES )/4)-1 ;
+	//tcb->priority = PRIORITY_QUEUES -1 ;
 	tcb->priority = (PRIORITY_QUEUES/2 ) -1 ;
 
 	/* Compute the stack segment address and size */
@@ -453,15 +454,15 @@ void yield(enum SCHED_CAUSE cause)
 
 
 	
-	if(yield_counter==50){
+	if(yield_counter==60){
 		rlnode* to_be_inserted;
 		yield_counter = 0;
 		for(int i = PRIORITY_QUEUES-2; i >= 0;i--){
-			while(!is_rlist_empty(&SCHED[i])){
+			if(!is_rlist_empty(&SCHED[i])){
 				to_be_inserted = rlist_pop_front(&SCHED[i]);
 				to_be_inserted->tcb->priority++;
 				rlist_push_back(&SCHED[i+1],to_be_inserted);
-			} 
+			}
 		}
 	}
 
