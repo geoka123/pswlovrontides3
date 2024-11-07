@@ -134,6 +134,7 @@ int sys_ThreadJoin(Tid_t tid, int* exitval) {
     thread_to_join_in->refcount--;  // refcount--
     if (thread_to_join_in->refcount == 0) {
         rlist_remove(&thread_to_join_in->ptcb_list_node);  // Clean up if no refs
+        free(thread_to_join_in);
     }
     return 0;
 }
@@ -235,14 +236,19 @@ void sys_ThreadExit(int exitval){
 
     // CLEAN UP REMAINING PTCBS
     rlnode* ptcb_list_in_proc = &CURPROC->ptcb_list;
-    for (int i=0; i<=rlist_len(ptcb_list_in_proc); i++) {
-      rlnode* temp_node = ptcb_list_in_proc;
-      // if (is_rlist_empty(ptcb_list_in_proc) == 1)
+    //for (int i=0; i<=rlist_len(ptcb_list_in_proc); i++) {
+    rlnode* temp_node;
+    PTCB * free_ptcb;
+      //if (is_rlist_empty(ptcb_list_in_proc) == 1)
       //   break;
-      if (&temp_node->ptcb->refcount == 0)
-        rlist_remove(&temp_node->ptcb->ptcb_list_node);
-      temp_node = temp_node->next;
+    while(!is_rlist_empty(ptcb_list_in_proc)){
+      temp_node = rlist_pop_front(ptcb_list_in_proc);
+      free_ptcb = temp_node->ptcb;
+      free(free_ptcb);
     }
+      //rlist_remove(&temp_node->ptcb->ptcb_list_node);
+      //temp_node = temp_node->next;
+    //}
 
     /* Disconnect my main_thread */
     curproc->main_thread = NULL;
