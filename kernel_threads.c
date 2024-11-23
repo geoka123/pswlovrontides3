@@ -3,6 +3,7 @@
 #include "kernel_sched.h"
 #include "kernel_proc.h"
 #include "kernel_cc.h" // Bazo tin kernel_wait mesa
+#include "kernel_streams.h" //gia to warning
 
 void initialize_process_thread_control_block(PTCB* ptcb){
   ptcb->tcb = NULL;
@@ -158,22 +159,23 @@ int sys_ThreadDetach(Tid_t tid)
   if (ptcb_of_thread->exited == 1)   // Check if the given tid corresponds to an exited thread
     return -1;
   
-  if (ptcb_of_thread == cur_thread()->ptcb){
-    ptcb_of_thread->detached = 1;    // Making the tid detached
-    kernel_broadcast(&(ptcb_of_thread->exit_cv));
-    return 0;
-  }
+  //   if (ptcb_of_thread == cur_thread()->ptcb){
+  //     ptcb_of_thread->detached = 1;    // Making the tid detached
+  //     kernel_broadcast(&(ptcb_of_thread->exit_cv));
+  //   return 0;
+  // }
   
-  if (tid == NOTHREAD)
-    return -1;
+  // if (tid == NOTHREAD)
+  //   return -1;
   
-  if (CURPROC->thread_count == 1)
-    return -1;
+  // if (CURPROC->thread_count == 1)
+  //   return -1;
 
-  ptcb_of_thread->detached = 1;    // Making the tid detached
-  kernel_broadcast(&(ptcb_of_thread->exit_cv));    // Waking up all the waiting threads and telling them that they aint gonna join it
 
-	return 0;
+   ptcb_of_thread->detached = 1;    // Making the tid detached
+   kernel_broadcast(&(ptcb_of_thread->exit_cv));    // Waking up all the waiting threads and telling them that they aint gonna join it
+
+	 return 0;
 }
 
 /**
@@ -238,13 +240,11 @@ void sys_ThreadExit(int exitval){
     rlnode* ptcb_list_in_proc = &CURPROC->ptcb_list;
     //for (int i=0; i<=rlist_len(ptcb_list_in_proc); i++) {
     rlnode* temp_node;
-    PTCB * free_ptcb;
       //if (is_rlist_empty(ptcb_list_in_proc) == 1)
       //   break;
     while(!is_rlist_empty(ptcb_list_in_proc)){
       temp_node = rlist_pop_front(ptcb_list_in_proc);
-      free_ptcb = temp_node->ptcb;
-      free(free_ptcb);
+      free(temp_node->ptcb);
     }
       //rlist_remove(&temp_node->ptcb->ptcb_list_node);
       //temp_node = temp_node->next;
