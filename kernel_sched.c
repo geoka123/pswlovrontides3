@@ -29,6 +29,7 @@ CCB cctx[MAX_CORES];
  */
 #define CURCORE (cctx[cpu_core_id])
 #define PRIORITY_QUEUES 32
+#define BOOST_COUNTER 60
 static int yield_counter = 0;
 
 /* 
@@ -454,7 +455,7 @@ void yield(enum SCHED_CAUSE cause)
 
 
 	
-	if(yield_counter==60){
+	if(yield_counter==BOOST_COUNTER){
 		rlnode* to_be_inserted;
 		yield_counter = 0;
 		for(int i = PRIORITY_QUEUES-2; i >= 0;i--){
