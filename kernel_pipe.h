@@ -6,7 +6,7 @@
 #include "tinyos.h"
 #include "kernel_streams.h"
 #include "kernel_proc.h"
-#define PIPE_BUFFER_SIZE 40000
+#define PIPE_BUFFER_SIZE 8192
 
 typedef struct pipe_control_block{
     FCB *reader,*writer;
