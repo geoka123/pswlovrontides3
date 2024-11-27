@@ -80,10 +80,48 @@ int pipe_write(void* ppcb , const char *buf , unsigned int n){// den exo katalab
 	// Elegxo an ppcb einai null
 	// Writer h reader einai closed -> return -1
 	// Buffer einai gemato -> kano kernel_wait sti has_space sto while 1) Oso o reader != null kai 2) Oso buffer einai full
-	// An bgo apo while kai reader == null -> return -1
+	// An bgo apo while kai reader == null -> grafo kai return 0
 	// An oxi apo to shmeio pou exo meinei grafo ena ena ta chars mexri na teleiosei
-	// Grafo me sys write
-	return -1;
+	
+	//kano return posa byte egrapsa
+	PPCB my_ppcb = (PPCB)ppcb;
+	if(my_ppcb == NULL){
+		return -1;
+	}
+
+	if(my_ppcb->reader==NULL || my_ppcb->writer == NULL){
+		return -1;
+	}
+
+	
+
+	while(my_ppcb->reader != NULL && my_ppcb->w_position ){ // edo ligo thema
+		kernel_wait(&(ppcb->has_space)); 
+	}
+
+	if(my_ppcb->reader == NULL){
+		return -1;
+	}
+
+	int freeSpace = (PIPE_BUFFER_SIZE - 1) - ppcb->w_position;
+	int charsWritten = 0;
+	int buffer_index = 0;
+
+	
+	while(freeSpace >=0){
+		if(n<=buffer_index-1){
+			my_ppcb->buffer[my_ppcb->w_position] = buf[buffer_index];
+			charsWritten++;
+			buffer_index++;
+			my_ppcb->w_position = (my_ppcb->w_position + 1 )% (PIPE_BUFFER_SIZE-1);
+		}
+		else{
+			break;
+		}
+	}
+	
+	kernel_broadcast(&(ppcb->has_data));
+	return charsWritten;
 }
 
 int pipe_read(void* ppcb ,char *buf , unsigned int n){
