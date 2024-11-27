@@ -23,13 +23,17 @@ void invalidFunction2(){
 // Arikopoiw read kai close
 static file_ops reader_file_ops = {
 	.Open = invalidFunction2,
-	.Write = invalidFunction_write
+	.Write = invalidFunction_write,
+	.Read = pipe_read,
+	.Close = pipe_reader_close
 };
 
 // Arxikopoiw write kai close
 static file_ops writer_file_ops = {
 	.Open = invalidFunction2,
-	.Read = invalidFunction_read
+	.Read = invalidFunction_read,
+	.Write = pipe_write,
+	.Close = pipe_writer_close
 };
 
 
