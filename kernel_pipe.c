@@ -3,6 +3,9 @@
 #include "kernel_pipe.h"
 #include "kernel_proc.h"
 #include "kernel_dev.h"
+#include "kernel_cc.h" 
+#include "kernel_streams.h"
+#include "kernel_sched.h"
 
 // Vale parametrous twn read kai write
 int invalidFunction_read(){
@@ -84,7 +87,7 @@ int pipe_write(void* ppcb , const char *buf , unsigned int n){// den exo katalab
 	// An oxi apo to shmeio pou exo meinei grafo ena ena ta chars mexri na teleiosei
 	
 	//kano return posa byte egrapsa
-	PPCB my_ppcb = (PPCB)ppcb;
+	PPCB* my_ppcb = (PPCB*) ppcb;
 	if(my_ppcb == NULL){
 		return -1;
 	}
@@ -96,14 +99,14 @@ int pipe_write(void* ppcb , const char *buf , unsigned int n){// den exo katalab
 	
 
 	while(my_ppcb->reader != NULL && my_ppcb->w_position ){ // edo ligo thema
-		kernel_wait(&(ppcb->has_space)); 
+		kernel_wait(&my_ppcb->has_space, SCHED_USER); 
 	}
 
 	if(my_ppcb->reader == NULL){
 		return -1;
 	}
 
-	int freeSpace = (PIPE_BUFFER_SIZE - 1) - ppcb->w_position;
+	int freeSpace = (PIPE_BUFFER_SIZE - 1) - my_ppcb->w_position;
 	int charsWritten = 0;
 	int buffer_index = 0;
 
@@ -120,7 +123,7 @@ int pipe_write(void* ppcb , const char *buf , unsigned int n){// den exo katalab
 		}
 	}
 	
-	kernel_broadcast(&(ppcb->has_data));
+	kernel_broadcast(&my_ppcb->has_data);
 	return charsWritten;
 }
 
@@ -128,10 +131,39 @@ int pipe_read(void* ppcb ,char *buf , unsigned int n){
 	// ----- ELEGXOI -----
 	// An reader
 	// Elegxo an ppcb einai null
+	PPCB* my_ppcb = (PPCB*) ppcb;
+	if (my_ppcb == NULL)
+		return -1;
+
+	int data_to_read = (PIPE_BUFFER_SIZE - 1) - my_ppcb->r_position;
+	int charsRead = 0;
+	int buffer_index = 0;
 	// An einai adeios o buffer && ppcb != null-> kernel_wait sto cv toy has_data
+	while (data_to_read <= PIPE_BUFFER_SIZE && my_ppcb != NULL && my_ppcb->writer != NULL) 
+		kernel_wait(&my_ppcb->has_data, SCHED_USER);
+	
+	if (my_ppcb == NULL)
+		return -1;
 	// Elegxo an writer einai null -> diavase
+	if (my_ppcb->writer == NULL) {
+		if (data_to_read <= PIPE_BUFFER_SIZE)
+			return -1;
+		else {
+			while(data_to_read > 0) {
+				if (n >= charsRead) {
+					buf[buffer_index] = my_ppcb->buffer[my_ppcb->r_position];
+					charsRead++;
+					buffer_index++;
+					my_ppcb->r_position = (my_ppcb->r_position + 1 )% (PIPE_BUFFER_SIZE-1);
+				}
+				else
+					break;
+			}
+		}
+	}
 	// Elegxo an o buffer exei dedomena
-	return -1;
+	kernel_broadcast(&my_ppcb->has_space);
+	return charsRead;
 }
 
 // Kano to W toy PPCB null
