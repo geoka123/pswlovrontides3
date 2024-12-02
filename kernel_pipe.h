@@ -14,6 +14,7 @@ typedef struct pipe_control_block{
     CondVar has_data;
 
     int w_position , r_position;
+    int free_space;
     char buffer[PIPE_BUFFER_SIZE];
 
 }PPCB;
