@@ -336,8 +336,85 @@ void sys_Exit(int exitval)
 
 
 
+
+int proc_info_invalidFunction_write(){
+	return -1;
+}
+	
+void* proc_info_invalidFunction_open(){
+	return NULL;
+}
+
+
+int proc_info_close(void* picb){
+  if(picb == NULL){
+    return -1;
+  }  
+  free(picb);
+  return 0;
+}
+
+
+
+int proc_info_read(void* picb , char* buf , unsigned int size){
+    
+  PICB* my_picb = picb;
+
+  if(my_picb->cursor < MAX_PROC-1){
+    PCB* pcb = &PT[my_picb->cursor];
+
+    if(pcb == NULL){
+      my_picb->cursor++;
+      return -1;
+    }
+    if(pcb->pstate != ALIVE){
+      my_picb->cursor++;
+      return -1;
+    }
+    else{
+      my_picb->p_info.pid = get_pid(pcb);
+      my_picb->p_info.alive = pcb->pstate == ALIVE ? 1 :0;
+      my_picb->p_info.ppid =  get_pid(pcb->parent);
+      my_picb->p_info.thread_count = pcb->thread_count;
+      my_picb->p_info.main_task = pcb->main_task;
+      my_picb->p_info.argl = pcb->argl;
+      memcpy(my_picb->p_info.args,(char*)pcb->args, pcb->argl);
+      my_picb->cursor++;
+
+      memcpy(buf,(char*)&my_picb->p_info , sizeof(procinfo));
+
+      return sizeof(procinfo);
+    }
+  }
+  return 0;  
+
+}
+
+static file_ops proc_info_file_ops = {
+  .Open = proc_info_invalidFunction_open,
+  .Read = proc_info_read,
+  .Write = proc_info_invalidFunction_write,
+  .Close = proc_info_close,
+};
+
+
+
 Fid_t sys_OpenInfo()
 {
-	return NOFILE;
+  Fid_t  fid;
+	FCB* fcb;
+	if(FCB_reserve(1,&fid,&fcb)){
+		PICB* picb;
+		picb = xmalloc(sizeof(PICB));
+		picb->cursor = 1;
+
+	  fcb->streamfunc = &proc_info_file_ops;
+    fcb->streamobj = picb;
+		return fid;
+	}
+	else
+		return NOFILE;
 }
+
+
 
