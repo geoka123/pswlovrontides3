@@ -17,7 +17,7 @@ int invalidFunction_write(){
 	return -1;
 }
 	
-void invalidFunction2(){
+void* invalidFunction2(){
 	return NULL;
 }
 
@@ -44,7 +44,7 @@ int pipe_write(void* ppcb , const char *buf , unsigned int n){// den exo katalab
 	}
 
 	while(my_ppcb->reader != NULL && my_ppcb->writer != NULL && my_ppcb-> free_space == 0){ // edo ligo thema
-		kernel_wait(&(my_ppcb->has_space),SCHED_USER); 
+		kernel_wait(&(my_ppcb->has_space),SCHED_PIPE); 
 	}
 
 	if(my_ppcb->reader == NULL || my_ppcb->writer == NULL){
@@ -95,8 +95,8 @@ int pipe_read(void* ppcb ,char *buf , unsigned int n){
 	int buffer_index = 0;
 	
 	// An einai adeios o buffer && ppcb != null-> kernel_wait sto cv toy has_data
-	while (my_ppcb->free_space == PIPE_BUFFER_SIZE && my_ppcb->writer != NULL& my_ppcb->reader != NULL) 
-		kernel_wait(&my_ppcb->has_data, SCHED_USER);
+	while ((my_ppcb->free_space == PIPE_BUFFER_SIZE )&&( my_ppcb->writer != NULL) && (my_ppcb->reader != NULL)) 
+		kernel_wait(&my_ppcb->has_data, SCHED_PIPE);
 	
 	
 
