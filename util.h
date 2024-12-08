@@ -290,6 +290,7 @@ typedef struct device_control_block DCB;	/**< @brief Forward declaration */
 typedef struct file_control_block FCB;		/**< @brief Forward declaration */
 typedef struct process_thread_control_block PTCB;   /**< @brief Forward declaration ///New Structure PTCB is defined!!*/
 typedef struct pipe_control_block PPCB;
+typedef struct socket_control_block SCCB;
 
 /** @brief A convenience typedef */
 typedef struct resource_list_node * rlnode_ptr;
@@ -314,6 +315,7 @@ typedef struct resource_list_node {
     TCB* tcb;
 	PTCB* ptcb; /* ///charge9 was here\\\*/
 	PPCB* ppcb;
+	SCCB* sscb;
     CCB* ccb;
     DCB* dcb;
     FCB* fcb;
