@@ -220,15 +220,6 @@ int sys_Pipe(pipe_t* pipe)
 
 		ppcb->writer->streamobj = ppcb;
 		ppcb->writer->streamfunc = &writer_file_ops;
-
-		// reader_file_ops.Read = pipe_read(ppcb, ppcb->buffer, PIPE_BUFFER_SIZE);
-
-		// writer_file_ops.Write = pipe_write(ppcb , ppcb->buffer , PIPE_BUFFER_SIZE);
-
-		// reader_file_ops.Close = pipe_reader_close(ppcb);
-
-		// writer_file_ops.Close = pipe_writer_close(ppcb);
-
 		return 0;
 	}
 	else
