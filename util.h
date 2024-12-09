@@ -315,7 +315,7 @@ typedef struct resource_list_node {
     TCB* tcb;
 	PTCB* ptcb; /* ///charge9 was here\\\*/
 	PPCB* ppcb;
-	SCCB* sscb;
+	SCCB* sccb;
     CCB* ccb;
     DCB* dcb;
     FCB* fcb;
