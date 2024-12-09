@@ -21,7 +21,7 @@ typedef enum socket_type_e {
 
 typedef struct listener_socket{
     rlnode queue;
-    CondVAr req_available;
+    CondVar req_available;
 }listener_socket;
 
 typedef struct peer_socket{
@@ -30,9 +30,11 @@ typedef struct peer_socket{
     PPCB* read_pipe;
 }peer_socket;
 
-rlnode unbound_socket;
+typedef struct unbound_socket{
+    rlnode unbound;
+}unbound_socket;
 
-typedef struct socket_cb{
+typedef struct socket_control_block{
     unsigned int refcount;
     FCB* fcb;
     socket_type type;
@@ -42,7 +44,7 @@ typedef struct socket_cb{
         listener_socket listener_s;
         unbound_socket unbound_s;
         peer_socket peer_s;
-    }
+    };
 }SCCB;
 
 
