@@ -81,16 +81,18 @@ int sys_Listen(Fid_t sock)
 	// ---------- ELEGXOI ----------
 	if (socket_port == NULL) // If socket not bound to a port => -1
 		return -1;
+	
 	// Pos elegxo an to file id einai illegal?
+	if(sock < 0 || sock > MAX_FILEID -1){
+		return -1;
+	}
+
 	// Pos vlepo an to port toy socket einai kateilimmeno apo allon listener?
-	if (&my_sock->peer_s != NULL || &my_sock->listener_s != NULL) // if socket already initialized => -1
+	if (PORT_MAP[socket_port] != NULL || my_sock->type == SOCKET_LISTENER)
 		return -1;
 
 	// Install the socket into PORT_MAP[]
-	if (socket_index < PORT_MAP - 1)
-		PORT_MAP[socket_index] = my_sock;
-	else
-		return -1;
+	PORT_MAP[socket_port] = my_sock;
 	
 	// Mark the socket as a listener socket
 	my_sock->type = SOCKET_LISTENER;
@@ -101,39 +103,60 @@ int sys_Listen(Fid_t sock)
 	rlnode_init(&listener_of_sock->queue, listener_of_sock);
 	listener_of_sock->req_available = COND_INIT;
 
-	while(rlist_len(&listener_of_sock->queue) == 0) {
-		kernel_wait(&listener_of_sock->req_available, SCHED_USER);
-	}
-
-	// Rwta gia ayto to erotima kai gia toyw elegxous poy kaneiw otan ksypnas
-
-
-	return -1;
+	return 0;
 }
 
 
 Fid_t sys_Accept(Fid_t lsock)
 {
 	// ---------- ELEGXOI ----------
-	if (lsock == NULL)
-		return NOFILE;
+	if(lsock < 0 || lsock > MAX_FILEID -1){
+		return -1;
+	}
 	
+	FCB* fcb_of_sock = (FCB*) lsock;
+	if (fcb_of_sock->streamobj == NULL)
+		return -1;
+
 	// How do i check if FID is illegal or is not initialized?
 
 	if (CURPROC->FIDT[15] != NULL) // Checking if process has no other available FIDs
 		return NOFILE;
 	
-	FCB* fcb_of_sock = (FCB*) lsock;
 	SCCB* my_sock = (SCCB*) fcb_of_sock->streamobj;
 
 	// How do i check if listening socket was closed while waiting
 
 	// Increase refcount
 	my_sock->refcount++;
+	listener_socket* listener_of_sock = (listener_socket*) &my_sock->listener_s;
 
+	while(is_rlist_empty(&listener_of_sock->req_available)) {
+		kernel_wait(&listener_of_sock->req_available, SCHED_USER);
+	}
+
+	// Check if port is still valid
+	if (my_sock->port == NOPORT)
+		return NOFILE;
 	
+	// Honor first request of queue
+	connection_request* first_request = rlist_pop_front(&listener_of_sock->queue);
+	first_request->admitted = 1;
 
-	return NOFILE;
+	// Try to construct peer    APO POU PAIRNO TA PPCB KAI AN TO KANO SOSTA
+	my_sock->type == SOCKET_PEER;
+	peer_socket* peer_of_sock = &my_sock->peer_s;
+	
+	Fid_t my_sock2 = sys_Socket(my_sock->port);
+
+	// Ftiaxno PPCB* me xmalloc
+
+	// Ftiaxno ta peer to peer
+
+	kernel_broadcast(&first_request->connected_cv);
+	my_sock->refcount--;
+
+	return my_sock2;
 }
 
 
