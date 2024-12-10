@@ -40,7 +40,7 @@ void boot_tinyos_kernel()
     initialize_devices();
     initialize_files();
     initialize_scheduler();
-    init_sockets();
+    // init_sockets();
 
     /* The boot task is executed normally! */
     if(Exec(boot_rec.init_task, boot_rec.argl, boot_rec.args)!=1)
