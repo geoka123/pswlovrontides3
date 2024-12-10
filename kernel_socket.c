@@ -43,7 +43,26 @@ int socket_write(void* sccb , const char *buf , unsigned int n){
 	return -1;
 }
 
-int socket_close(void* sccb){return -1;}
+int socket_close(void* sccb){
+	Fid_t sock = (Fid_t)(intptr_t) sccb;
+	FCB* fcb = get_fcb(sock);
+
+	if(fcb==NULL){
+		return -1;
+	}
+
+	if(sys_ShutDown(sock,SHUTDOWN_BOTH)!=0){
+		return -1;
+	}
+
+	SCCB* my_sock =(SCCB*)fcb->streamobj;
+
+	if(my_sock->refcount == 0){
+		my_sock = NULL;
+		free(my_sock);
+	}
+	return 0;
+}
 
 static file_ops socket_file_ops = {
   .Open = socket_invalidFunction_open,
@@ -123,7 +142,7 @@ Fid_t sys_Accept(Fid_t lsock)
 	SCCB* my_sock = (SCCB*) fcb_of_sock->streamobj;
 
 	if (my_sock == NULL || my_sock->port == NOPORT || my_sock->type == SOCKET_UNBOUND)
-		return -1;
+		return NOFILE;
 	// How do i check if listening socket was closed while waiting
 
 	// Increase refcount
@@ -132,50 +151,61 @@ Fid_t sys_Accept(Fid_t lsock)
 	while(is_rlist_empty(&my_sock->listener_s.queue) != 0) {
 		kernel_wait(&my_sock->listener_s.req_available, SCHED_USER);
 	}
-
+	//my_sock->refcount--;
 	// Check if port is still valid
 	if (my_sock->port == NOPORT)
 		return NOFILE;
 	
 	// Honor first request of queue
 	connection_request* first_request = (connection_request*) rlist_pop_front(&my_sock->listener_s.queue);
+	if(first_request == NULL)
+		return NOFILE;
 	first_request->admitted = 1;
 
 	// Try to construct peer    APO POU PAIRNO TA PPCB KAI AN TO KANO SOSTA
-	my_sock->type = SOCKET_PEER;
-	peer_socket* peer_of_sock1 = &my_sock->peer_s;
-	
-	Fid_t my_sock_fid2 = sys_Socket(my_sock->port);
-	FCB* fcb_of_sock2 = (FCB*) &my_sock_fid2;
-	SCCB* my_sock2 = (SCCB*) fcb_of_sock2->streamobj;
-	my_sock2->type = SOCKET_PEER;
+	//my_sock->type = SOCKET_PEER;
+	SCCB* my_sock2 = first_request->peer; //s2
 	peer_socket* peer_of_sock2 = &my_sock2->peer_s;
+	
+	
+	Fid_t my_sock_fid3 = sys_Socket(my_sock->port); //s3 ///edo ti ginetai charge9
+	if(my_sock_fid3 == NOFILE)
+		return NOFILE;
+
+	FCB* fcb_of_sock3 = get_fcb(my_sock_fid3);
+	if(fcb_of_sock3->streamobj == NULL)
+		return NOFILE;
+	SCCB* my_sock3 = (SCCB*) fcb_of_sock3->streamobj;
+	if(my_sock3 == NULL)
+		return NOFILE;
+	my_sock3->type = SOCKET_PEER;
+	peer_socket* peer_of_sock3 = &my_sock3->peer_s;
 
 	// Ftiaxno PPCB* me xmalloc
 	PPCB* pipe1 = xmalloc(sizeof(PPCB));
 	PPCB* pipe2 = xmalloc(sizeof(PPCB));
 	
 	// Ftiaxno ta peer to peer
-	peer_of_sock1->read_pipe = pipe1;
-	peer_of_sock2->write_pipe = pipe1;
+	peer_of_sock2->read_pipe = pipe1;
+	peer_of_sock3->write_pipe = pipe1;
 
-	peer_of_sock1->write_pipe = pipe2;
-	peer_of_sock2->read_pipe = pipe2;
+	peer_of_sock2->write_pipe = pipe2;
+	peer_of_sock3->read_pipe = pipe2;
 
-	peer_of_sock1->peer = my_sock2;
-	peer_of_sock2->peer = my_sock;
+	peer_of_sock2->peer = my_sock3;
+	peer_of_sock3->peer = my_sock2;
 	
-	kernel_broadcast(&first_request->connected_cv);
+	kernel_signal(&(first_request->connected_cv));
 	my_sock->refcount--;
 
-	return my_sock_fid2;
+	return my_sock_fid3;
 }
 
 int sys_Connect(Fid_t sock, port_t port, timeout_t timeout)
 {
-	if(sock < 0 || sock > MAX_FILEID -1){
-		return -1;
-	}
+	// if(sock < 0 || sock > MAX_FILEID -1){
+	// 	return -1;
+	// }
 
 	FCB * my_sock = get_fcb(sock);
 
@@ -189,36 +219,42 @@ int sys_Connect(Fid_t sock, port_t port, timeout_t timeout)
 		return -1;
 	}
 
-	if(PORT_MAP[port]==NULL || PORT_MAP[port]==NOPORT){
+	if(PORT_MAP[port]==NULL){
 		return -1;
 	}
 	SCCB* is_listener = PORT_MAP[port];//s1 listener
 
-	if(!(sccb->type == SOCKET_LISTENER)){
+	if(!(is_listener->type == SOCKET_LISTENER)){
 		return -1;
 	}
 
 	is_listener->refcount++;
 
+	//sccb->type = SOCKET_PEER;//charge 
+	if(sccb->type != SOCKET_UNBOUND){
+		return -1;
+	}
 	connection_request* con_req = (connection_request*)xmalloc(sizeof(connection_request));
 
 	con_req -> admitted = 0;
 	con_req ->peer = sccb;
 	con_req->connected_cv = COND_INIT;
+
 	rlnode_init(&con_req->queue_node,con_req);
 
 	rlist_push_back(&is_listener->listener_s.queue,&con_req->queue_node);
 
 
-	kernel_broadcast(&is_listener->listener_s.req_available);
+	kernel_signal(&(is_listener->listener_s.req_available));
 
 	while(con_req ->admitted == 0 ){
-		kernel_timedwait(&con_req->connected_cv,SCHED_PIPE,500);
+		kernel_timedwait(&(con_req->connected_cv),SCHED_USER,timeout);
 	}
 	if(con_req->admitted==1){
 		is_listener->refcount--;
 		return 0;
 	}
+	is_listener->refcount--;
 	return -1;
 }
 
