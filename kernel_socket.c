@@ -1,8 +1,8 @@
-
 #include "tinyos.h"
 #include "kernel_socket.h"
 #include "kernel_streams.h"
 #include "kernel_pipe.h"
+#include "kernel_pipe.c"
 #include "kernel_proc.h"
  
 #include "kernel_dev.h"
@@ -11,11 +11,11 @@
 SCCB* PORT_MAP[MAX_PORT];
 //PORT_MAP[0] = NULL;
 
-void init_sockets() {
-	for (int i=0; i <= MAX_PORT - 1; i++) {
-		PORT_MAP[i] == NULL;
-	}
-}
+// void init_sockets() {
+// 	for (int i=0; i <= MAX_PORT - 1; i++) {
+// 		PORT_MAP[i] = NULL;
+// 	}
+// }
 
 void* socket_invalidFunction_open(){
 	return NULL;
@@ -45,7 +45,7 @@ int socket_write(void* sccb , const char *buf , unsigned int n){
 	return -1;
 }
 
-int socket_close(void* sccb){}
+int socket_close(void* sccb){return 0;}
 
 static file_ops socket_file_ops = {
   .Open = socket_invalidFunction_open,
@@ -115,7 +115,7 @@ Fid_t sys_Accept(Fid_t lsock)
 		return -1;
 	}
 	
-	FCB* fcb_of_sock = (FCB*) lsock;
+	FCB* fcb_of_sock = (FCB*) &lsock;
 	if (fcb_of_sock->streamobj == NULL)
 		return -1;
 
@@ -130,10 +130,9 @@ Fid_t sys_Accept(Fid_t lsock)
 
 	// Increase refcount
 	my_sock->refcount++;
-	listener_socket* listener_of_sock = (listener_socket*) &my_sock->listener_s;
 
-	while(is_rlist_empty(&listener_of_sock->req_available)) {
-		kernel_wait(&listener_of_sock->req_available, SCHED_USER);
+	while(is_rlist_empty(&my_sock->listener_s.queue) != 0) {
+		kernel_wait(&my_sock->listener_s.req_available, SCHED_USER);
 	}
 
 	// Check if port is still valid
@@ -141,15 +140,15 @@ Fid_t sys_Accept(Fid_t lsock)
 		return NOFILE;
 	
 	// Honor first request of queue
-	connection_request* first_request = (connection_request*) rlist_pop_front(&listener_of_sock->queue);
+	connection_request* first_request = (connection_request*) rlist_pop_front(&my_sock->listener_s.queue);
 	first_request->admitted = 1;
 
 	// Try to construct peer    APO POU PAIRNO TA PPCB KAI AN TO KANO SOSTA
-	my_sock->type == SOCKET_PEER;
+	my_sock->type = SOCKET_PEER;
 	peer_socket* peer_of_sock1 = &my_sock->peer_s;
 	
 	Fid_t my_sock_fid2 = sys_Socket(my_sock->port);
-	FCB* fcb_of_sock2 = (FCB*) my_sock_fid2;
+	FCB* fcb_of_sock2 = (FCB*) &my_sock_fid2;
 	SCCB* my_sock2 = (SCCB*) fcb_of_sock2->streamobj;
 	my_sock2->type = SOCKET_PEER;
 	peer_socket* peer_of_sock2 = &my_sock2->peer_s;
@@ -171,7 +170,7 @@ Fid_t sys_Accept(Fid_t lsock)
 	kernel_broadcast(&first_request->connected_cv);
 	my_sock->refcount--;
 
-	return my_sock2;
+	return my_sock_fid2;
 }
 
 
@@ -202,7 +201,6 @@ int sys_Connect(Fid_t sock, port_t port, timeout_t timeout)
 		return -1;
 	}
 
-	listener_socket* listener = &is_listener->listener_s;
 	is_listener->refcount++;
 
 	connection_request* con_req = (connection_request*)xmalloc(sizeof(connection_request));
