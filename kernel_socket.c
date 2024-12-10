@@ -11,11 +11,11 @@
 SCCB* PORT_MAP[MAX_PORT];
 //PORT_MAP[0] = NULL;
 
-// void init_sockets() {
-// 	for (int i=0; i <= MAX_PORT - 1; i++) {
-// 		PORT_MAP[i] = NULL;
-// 	}
-// }
+void initialize_sockets() {
+	for (int i=0; i<MAX_PORT; i++) {
+		PORT_MAP[i] = NULL;
+	}
+}
 
 void* socket_invalidFunction_open(){
 	return NULL;
@@ -79,7 +79,7 @@ Fid_t sys_Socket(port_t port)
 
 int sys_Listen(Fid_t sock)
 {
-	FCB* fcb_sock = (FCB*) &sock;
+	FCB* fcb_sock = get_fcb(sock);
 	SCCB* my_sock = (SCCB*) fcb_sock->streamobj;
 
 	// ---------- ELEGXOI ----------
@@ -89,7 +89,7 @@ int sys_Listen(Fid_t sock)
 	}
 
 	// Pos vlepo an to port toy socket einai kateilimmeno apo allon listener?
-	if (PORT_MAP[my_sock->port] != NULL && (PORT_MAP[my_sock->port])->type == SOCKET_LISTENER)
+	if (PORT_MAP[my_sock->port] != NULL && PORT_MAP[my_sock->port]->type == SOCKET_LISTENER)
 		return -1;
 
 	// Install the socket into PORT_MAP[]
@@ -107,7 +107,6 @@ int sys_Listen(Fid_t sock)
 	return 0;
 }
 
-
 Fid_t sys_Accept(Fid_t lsock)
 {
 	// ---------- ELEGXOI ----------
@@ -115,7 +114,8 @@ Fid_t sys_Accept(Fid_t lsock)
 		return -1;
 	}
 	
-	FCB* fcb_of_sock = (FCB*) &lsock;
+	FCB* fcb_of_sock = get_fcb(lsock);
+
 	if (fcb_of_sock->streamobj == NULL)
 		return -1;
 
@@ -173,14 +173,13 @@ Fid_t sys_Accept(Fid_t lsock)
 	return my_sock_fid2;
 }
 
-
 int sys_Connect(Fid_t sock, port_t port, timeout_t timeout)
 {
 	if(sock < 0 || sock > MAX_FILEID -1){
 		return -1;
 	}
 
-	FCB * my_sock = (FCB*)&sock;
+	FCB * my_sock = get_fcb(sock);
 
 	if(my_sock->streamobj==NULL){
 		return -1;
@@ -224,7 +223,6 @@ int sys_Connect(Fid_t sock, port_t port, timeout_t timeout)
 	}
 	return -1;
 }
-
 
 int sys_ShutDown(Fid_t sock, shutdown_mode how)
 {

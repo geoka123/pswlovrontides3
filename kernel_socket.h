@@ -56,6 +56,20 @@ typedef struct connection_request{
     rlnode queue_node;
 }connection_request;
 
+int socket_read(void* sccb , char* buf , unsigned int size);
 
+int socket_write(void* sccb , const char *buf , unsigned int n);
+
+Fid_t sys_Socket(port_t port);
+
+void initialize_sockets();
+
+int sys_Listen(Fid_t sock);
+
+Fid_t sys_Accept(Fid_t lsock);
+
+int sys_Connect(Fid_t sock, port_t port, timeout_t timeout);
+
+int sys_ShutDown(Fid_t sock, shutdown_mode how);
 
 #endif

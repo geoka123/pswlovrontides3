@@ -127,6 +127,15 @@ void FCB_unreserve(size_t num, Fid_t *fid, FCB** fcb);
  */
 FCB* get_fcb(Fid_t fid);
 
+int pipe_write(void* ppcb , const char *buf , unsigned int n);
+
+int pipe_read(void* ppcb ,char *buf , unsigned int n);
+
+int pipe_writer_close(void* ppcb);
+
+int pipe_reader_close(void* ppcb);
+
+int sys_Pipe(pipe_t* pipe);
 
 /** @} */
 
