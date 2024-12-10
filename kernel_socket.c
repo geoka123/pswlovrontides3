@@ -85,6 +85,53 @@ Fid_t sys_Accept(Fid_t lsock)
 
 int sys_Connect(Fid_t sock, port_t port, timeout_t timeout)
 {
+	if(sock < 0 || sock > MAX_FILEID -1){
+		return -1;
+	}
+
+	FCB * my_sock = (FCB*)&sock;
+
+	if(my_sock->streamobj==NULL){
+		return -1;
+	}
+
+	SCCB* sccb = (SCCB*)my_sock->streamobj;//s2 client
+
+	if(!(port>=NOPORT && port <= MAX_PORT)){
+		return -1;
+	}
+
+	if(PORT_MAP[port]==NULL || PORT_MAP[port]==NOPORT){
+		return -1;
+	}
+	SCCB* is_listener = PORT_MAP[port];//s1 listener
+
+	if(!(sccb->type == SOCKET_LISTENER)){
+		return -1;
+	}
+
+	listener_socket* listener = &is_listener->listener_s;
+	is_listener->refcount++;
+
+	connection_request* con_req = (connection_request*)xmalloc(sizeof(connection_request));
+
+	con_req -> admitted = 0;
+	con_req ->peer = sccb;
+	con_req->connected_cv = COND_INIT;
+	rlnode_init(&con_req->queue_node,con_req);
+
+	rlist_push_back(&is_listener->listener_s.queue,&con_req->queue_node);
+
+
+	kernel_broadcast(&is_listener->listener_s.req_available);
+
+	while(con_req ->admitted == 0 ){
+		kernel_timedwait(&con_req->connected_cv,SCHED_PIPE,500);
+	}
+	if(con_req->admitted==1){
+		is_listener->refcount--;
+		return 0;
+	}
 	return -1;
 }
 
@@ -120,7 +167,7 @@ int sys_ShutDown(Fid_t sock, shutdown_mode how)
 					default:
 						return -1;
 				}
-				return 0;
+				//return 0;
 			}
 			return -1;
 		}
