@@ -367,13 +367,13 @@ int proc_info_read(void* picb , char* buf , unsigned int size){
       my_picb->cursor++;
       return -1;
     }
-    if(pcb->pstate != ALIVE){
+    if(pcb->pstate == FREE){
       my_picb->cursor++;
       return -1;
     }
     else{
       my_picb->p_info.pid = get_pid(pcb);
-      my_picb->p_info.alive = pcb->pstate == ALIVE ? 1 :0;
+      my_picb->p_info.alive = pcb->pstate == ALIVE ? 1 :2;
       my_picb->p_info.ppid =  get_pid(pcb->parent);
       my_picb->p_info.thread_count = pcb->thread_count;
       my_picb->p_info.main_task = pcb->main_task;
