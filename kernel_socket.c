@@ -1,4 +1,3 @@
-
 #include "tinyos.h"
 #include "kernel_socket.h"
 #include "kernel_streams.h"
@@ -9,8 +8,13 @@
 #include "kernel_cc.h" 
 
 SCCB* PORT_MAP[MAX_PORT];
-static int socket_index = 1; // Index of PORT_MAP
 //PORT_MAP[0] = NULL;
+
+void initialize_sockets() {
+	for (int i=0; i<MAX_PORT; i++) {
+		PORT_MAP[i] = NULL;
+	}
+}
 
 void* socket_invalidFunction_open(){
 	return NULL;
@@ -40,7 +44,7 @@ int socket_write(void* sccb , const char *buf , unsigned int n){
 	return -1;
 }
 
-int socket_close(void* sccb){}
+int socket_close(void* sccb){return 0;}
 
 static file_ops socket_file_ops = {
   .Open = socket_invalidFunction_open,
@@ -74,23 +78,21 @@ Fid_t sys_Socket(port_t port)
 
 int sys_Listen(Fid_t sock)
 {
-	FCB* fcb_sock = (FCB*) &sock;
+	FCB* fcb_sock = get_fcb(sock);
 	SCCB* my_sock = (SCCB*) fcb_sock->streamobj;
-	port_t socket_port = my_sock->port;
 
 	// ---------- ELEGXOI ----------
-	if (socket_port == NULL) // If socket not bound to a port => -1
-		return -1;
 	// Pos elegxo an to file id einai illegal?
+	if(sock < 0 || sock > MAX_FILEID -1){
+		return -1;
+	}
+
 	// Pos vlepo an to port toy socket einai kateilimmeno apo allon listener?
-	if (&my_sock->peer_s != NULL || &my_sock->listener_s != NULL) // if socket already initialized => -1
+	if (PORT_MAP[my_sock->port] != NULL && PORT_MAP[my_sock->port]->type == SOCKET_LISTENER)
 		return -1;
 
 	// Install the socket into PORT_MAP[]
-	if (socket_index < PORT_MAP - 1)
-		PORT_MAP[socket_index] = my_sock;
-	else
-		return -1;
+	PORT_MAP[my_sock->port] = my_sock;
 	
 	// Mark the socket as a listener socket
 	my_sock->type = SOCKET_LISTENER;
@@ -101,29 +103,25 @@ int sys_Listen(Fid_t sock)
 	rlnode_init(&listener_of_sock->queue, listener_of_sock);
 	listener_of_sock->req_available = COND_INIT;
 
-	while(rlist_len(&listener_of_sock->queue) == 0) {
-		kernel_wait(&listener_of_sock->req_available, SCHED_USER);
-	}
-
-	// Rwta gia ayto to erotima kai gia toyw elegxous poy kaneiw otan ksypnas
-
-
-	return -1;
+	return 0;
 }
-
 
 Fid_t sys_Accept(Fid_t lsock)
 {
 	// ---------- ELEGXOI ----------
-	if (lsock == NULL)
-		return NOFILE;
+	if(lsock < 0 || lsock > MAX_FILEID -1){
+		return -1;
+	}
 	
+	FCB* fcb_of_sock = get_fcb(lsock);
+	if (fcb_of_sock->streamobj == NULL)
+		return -1;
+
 	// How do i check if FID is illegal or is not initialized?
 
 	if (CURPROC->FIDT[15] != NULL) // Checking if process has no other available FIDs
 		return NOFILE;
 	
-	FCB* fcb_of_sock = (FCB*) lsock;
 	SCCB* my_sock = (SCCB*) fcb_of_sock->streamobj;
 
 	// How do i check if listening socket was closed while waiting
@@ -131,17 +129,98 @@ Fid_t sys_Accept(Fid_t lsock)
 	// Increase refcount
 	my_sock->refcount++;
 
+	while(is_rlist_empty(&my_sock->listener_s.queue) != 0) {
+		kernel_wait(&my_sock->listener_s.req_available, SCHED_USER);
+	}
+
+	// Check if port is still valid
+	if (my_sock->port == NOPORT)
+		return NOFILE;
 	
+	// Honor first request of queue
+	connection_request* first_request = (connection_request*) rlist_pop_front(&my_sock->listener_s.queue);
+	first_request->admitted = 1;
 
-	return NOFILE;
+	// Try to construct peer    APO POU PAIRNO TA PPCB KAI AN TO KANO SOSTA
+	my_sock->type = SOCKET_PEER;
+	peer_socket* peer_of_sock1 = &my_sock->peer_s;
+	
+	Fid_t my_sock_fid2 = sys_Socket(my_sock->port);
+	FCB* fcb_of_sock2 = (FCB*) &my_sock_fid2;
+	SCCB* my_sock2 = (SCCB*) fcb_of_sock2->streamobj;
+	my_sock2->type = SOCKET_PEER;
+	peer_socket* peer_of_sock2 = &my_sock2->peer_s;
+
+	// Ftiaxno PPCB* me xmalloc
+	PPCB* pipe1 = xmalloc(sizeof(PPCB));
+	PPCB* pipe2 = xmalloc(sizeof(PPCB));
+	
+	// Ftiaxno ta peer to peer
+	peer_of_sock1->read_pipe = pipe1;
+	peer_of_sock2->write_pipe = pipe1;
+
+	peer_of_sock1->write_pipe = pipe2;
+	peer_of_sock2->read_pipe = pipe2;
+
+	peer_of_sock1->peer = my_sock2;
+	peer_of_sock2->peer = my_sock;
+	
+	kernel_broadcast(&first_request->connected_cv);
+	my_sock->refcount--;
+
+	return my_sock_fid2;
 }
-
 
 int sys_Connect(Fid_t sock, port_t port, timeout_t timeout)
 {
+	if(sock < 0 || sock > MAX_FILEID -1){
+		return -1;
+	}
+
+	FCB * my_sock = get_fcb(sock);
+
+	if(my_sock->streamobj==NULL){
+		return -1;
+	}
+
+	SCCB* sccb = (SCCB*)my_sock->streamobj;//s2 client
+
+	if(!(port>=NOPORT && port <= MAX_PORT)){
+		return -1;
+	}
+
+	if(PORT_MAP[port]==NULL || PORT_MAP[port]==NOPORT){
+		return -1;
+	}
+	SCCB* is_listener = PORT_MAP[port];//s1 listener
+
+	if(!(sccb->type == SOCKET_LISTENER)){
+		return -1;
+	}
+
+	is_listener->refcount++;
+
+	connection_request* con_req = (connection_request*)xmalloc(sizeof(connection_request));
+
+	con_req -> admitted = 0;
+	con_req ->peer = sccb;
+	con_req->connected_cv = COND_INIT;
+	rlnode_init(&con_req->queue_node,con_req);
+
+	rlist_push_back(&is_listener->listener_s.queue,&con_req->queue_node);
+
+
+	kernel_broadcast(&is_listener->listener_s.req_available);
+
+	while(con_req ->admitted == 0 ){
+		kernel_timedwait(&con_req->connected_cv,SCHED_PIPE,500);
+	}
+	if(con_req->admitted==1){
+		is_listener->refcount--;
+		return 0;
+	}
 	return -1;
 }
-
 
 int sys_ShutDown(Fid_t sock, shutdown_mode how)
 {
@@ -174,7 +253,7 @@ int sys_ShutDown(Fid_t sock, shutdown_mode how)
 					default:
 						return -1;
 				}
-				return 0;
+				//return 0;
 			}
 			return -1;
 		}
