@@ -9,6 +9,7 @@
 #include "kernel_cc.h" 
 
 SCCB* PORT_MAP[MAX_PORT];
+static int socket_index = 1; // Index of PORT_MAP
 //PORT_MAP[0] = NULL;
 
 void* socket_invalidFunction_open(){
@@ -73,12 +74,65 @@ Fid_t sys_Socket(port_t port)
 
 int sys_Listen(Fid_t sock)
 {
+	FCB* fcb_sock = (FCB*) &sock;
+	SCCB* my_sock = (SCCB*) fcb_sock->streamobj;
+	port_t socket_port = my_sock->port;
+
+	// ---------- ELEGXOI ----------
+	if (socket_port == NULL) // If socket not bound to a port => -1
+		return -1;
+	// Pos elegxo an to file id einai illegal?
+	// Pos vlepo an to port toy socket einai kateilimmeno apo allon listener?
+	if (&my_sock->peer_s != NULL || &my_sock->listener_s != NULL) // if socket already initialized => -1
+		return -1;
+
+	// Install the socket into PORT_MAP[]
+	if (socket_index < PORT_MAP - 1)
+		PORT_MAP[socket_index] = my_sock;
+	else
+		return -1;
+	
+	// Mark the socket as a listener socket
+	my_sock->type = SOCKET_LISTENER;
+
+	// Initialize the listener_socket fields of the union
+	listener_socket* listener_of_sock = &my_sock->listener_s;
+
+	rlnode_init(&listener_of_sock->queue, listener_of_sock);
+	listener_of_sock->req_available = COND_INIT;
+
+	while(rlist_len(&listener_of_sock->queue) == 0) {
+		kernel_wait(&listener_of_sock->req_available, SCHED_USER);
+	}
+
+	// Rwta gia ayto to erotima kai gia toyw elegxous poy kaneiw otan ksypnas
+
+
 	return -1;
 }
 
 
 Fid_t sys_Accept(Fid_t lsock)
 {
+	// ---------- ELEGXOI ----------
+	if (lsock == NULL)
+		return NOFILE;
+	
+	// How do i check if FID is illegal or is not initialized?
+
+	if (CURPROC->FIDT[15] != NULL) // Checking if process has no other available FIDs
+		return NOFILE;
+	
+	FCB* fcb_of_sock = (FCB*) lsock;
+	SCCB* my_sock = (SCCB*) fcb_of_sock->streamobj;
+
+	// How do i check if listening socket was closed while waiting
+
+	// Increase refcount
+	my_sock->refcount++;
+
+	
+
 	return NOFILE;
 }
 
