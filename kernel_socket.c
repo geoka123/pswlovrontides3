@@ -2,6 +2,7 @@
 #include "kernel_socket.h"
 #include "kernel_streams.h"
 #include "kernel_pipe.h"
+#include "kernel_pipe.c"
 #include "kernel_proc.h"
  
 #include "kernel_dev.h"
@@ -114,6 +115,7 @@ Fid_t sys_Accept(Fid_t lsock)
 	}
 	
 	FCB* fcb_of_sock = get_fcb(lsock);
+
 	if (fcb_of_sock->streamobj == NULL)
 		return -1;
 
