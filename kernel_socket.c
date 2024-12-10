@@ -1,8 +1,6 @@
 #include "tinyos.h"
 #include "kernel_socket.h"
 #include "kernel_streams.h"
-#include "kernel_pipe.h"
-#include "kernel_pipe.c"
 #include "kernel_proc.h"
  
 #include "kernel_dev.h"
@@ -45,7 +43,7 @@ int socket_write(void* sccb , const char *buf , unsigned int n){
 	return -1;
 }
 
-int socket_close(void* sccb){return 0;}
+int socket_close(void* sccb){return -1;}
 
 static file_ops socket_file_ops = {
   .Open = socket_invalidFunction_open,
@@ -79,16 +77,18 @@ Fid_t sys_Socket(port_t port)
 
 int sys_Listen(Fid_t sock)
 {
+	if(sock ==NOFILE)
+		return -1;
+
 	FCB* fcb_sock = get_fcb(sock);
+	
+	if (fcb_sock == NULL)
+		return -1;
 	SCCB* my_sock = (SCCB*) fcb_sock->streamobj;
 
-	// ---------- ELEGXOI ----------
-	// Pos elegxo an to file id einai illegal?
-	if(sock < 0 || sock > MAX_FILEID -1){
+	if (my_sock == NULL || my_sock->port == NOPORT)
 		return -1;
-	}
 
-	// Pos vlepo an to port toy socket einai kateilimmeno apo allon listener?
 	if (PORT_MAP[my_sock->port] != NULL && PORT_MAP[my_sock->port]->type == SOCKET_LISTENER)
 		return -1;
 
@@ -98,11 +98,8 @@ int sys_Listen(Fid_t sock)
 	// Mark the socket as a listener socket
 	my_sock->type = SOCKET_LISTENER;
 
-	// Initialize the listener_socket fields of the union
-	listener_socket* listener_of_sock = &my_sock->listener_s;
-
-	rlnode_init(&listener_of_sock->queue, listener_of_sock);
-	listener_of_sock->req_available = COND_INIT;
+	rlnode_init(&my_sock->listener_s.queue, my_sock);
+	my_sock->listener_s.req_available = COND_INIT;
 
 	return 0;
 }
@@ -110,13 +107,12 @@ int sys_Listen(Fid_t sock)
 Fid_t sys_Accept(Fid_t lsock)
 {
 	// ---------- ELEGXOI ----------
-	if(lsock < 0 || lsock > MAX_FILEID -1){
+	if(lsock ==NOFILE)
 		return -1;
-	}
 	
 	FCB* fcb_of_sock = get_fcb(lsock);
 
-	if (fcb_of_sock->streamobj == NULL)
+	if (fcb_of_sock == NULL)
 		return -1;
 
 	// How do i check if FID is illegal or is not initialized?
@@ -126,6 +122,8 @@ Fid_t sys_Accept(Fid_t lsock)
 	
 	SCCB* my_sock = (SCCB*) fcb_of_sock->streamobj;
 
+	if (my_sock == NULL || my_sock->port == NOPORT || my_sock->type == SOCKET_UNBOUND)
+		return -1;
 	// How do i check if listening socket was closed while waiting
 
 	// Increase refcount
