@@ -9,8 +9,13 @@
 #include "kernel_cc.h" 
 
 SCCB* PORT_MAP[MAX_PORT];
-static int socket_index = 1; // Index of PORT_MAP
 //PORT_MAP[0] = NULL;
+
+void init_sockets() {
+	for (int i=0; i <= MAX_PORT - 1; i++) {
+		PORT_MAP[i] == NULL;
+	}
+}
 
 void* socket_invalidFunction_open(){
 	return NULL;
@@ -76,23 +81,19 @@ int sys_Listen(Fid_t sock)
 {
 	FCB* fcb_sock = (FCB*) &sock;
 	SCCB* my_sock = (SCCB*) fcb_sock->streamobj;
-	port_t socket_port = my_sock->port;
 
 	// ---------- ELEGXOI ----------
-	if (socket_port == NULL) // If socket not bound to a port => -1
-		return -1;
-	
 	// Pos elegxo an to file id einai illegal?
 	if(sock < 0 || sock > MAX_FILEID -1){
 		return -1;
 	}
 
 	// Pos vlepo an to port toy socket einai kateilimmeno apo allon listener?
-	if (PORT_MAP[socket_port] != NULL || my_sock->type == SOCKET_LISTENER)
+	if (PORT_MAP[my_sock->port] != NULL && (PORT_MAP[my_sock->port])->type == SOCKET_LISTENER)
 		return -1;
 
 	// Install the socket into PORT_MAP[]
-	PORT_MAP[socket_port] = my_sock;
+	PORT_MAP[my_sock->port] = my_sock;
 	
 	// Mark the socket as a listener socket
 	my_sock->type = SOCKET_LISTENER;
@@ -140,19 +141,33 @@ Fid_t sys_Accept(Fid_t lsock)
 		return NOFILE;
 	
 	// Honor first request of queue
-	connection_request* first_request = rlist_pop_front(&listener_of_sock->queue);
+	connection_request* first_request = (connection_request*) rlist_pop_front(&listener_of_sock->queue);
 	first_request->admitted = 1;
 
 	// Try to construct peer    APO POU PAIRNO TA PPCB KAI AN TO KANO SOSTA
 	my_sock->type == SOCKET_PEER;
-	peer_socket* peer_of_sock = &my_sock->peer_s;
+	peer_socket* peer_of_sock1 = &my_sock->peer_s;
 	
-	Fid_t my_sock2 = sys_Socket(my_sock->port);
+	Fid_t my_sock_fid2 = sys_Socket(my_sock->port);
+	FCB* fcb_of_sock2 = (FCB*) my_sock_fid2;
+	SCCB* my_sock2 = (SCCB*) fcb_of_sock2->streamobj;
+	my_sock2->type = SOCKET_PEER;
+	peer_socket* peer_of_sock2 = &my_sock2->peer_s;
 
 	// Ftiaxno PPCB* me xmalloc
-
+	PPCB* pipe1 = xmalloc(sizeof(PPCB));
+	PPCB* pipe2 = xmalloc(sizeof(PPCB));
+	
 	// Ftiaxno ta peer to peer
+	peer_of_sock1->read_pipe = pipe1;
+	peer_of_sock2->write_pipe = pipe1;
 
+	peer_of_sock1->write_pipe = pipe2;
+	peer_of_sock2->read_pipe = pipe2;
+
+	peer_of_sock1->peer = my_sock2;
+	peer_of_sock2->peer = my_sock;
+	
 	kernel_broadcast(&first_request->connected_cv);
 	my_sock->refcount--;
 
