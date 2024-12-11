@@ -60,6 +60,8 @@ int socket_read(void* sccb , char* buf , unsigned int size);
 
 int socket_write(void* sccb , const char *buf , unsigned int n);
 
+int socket_close(void* fid);
+
 Fid_t sys_Socket(port_t port);
 
 void initialize_sockets();
