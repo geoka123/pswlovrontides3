@@ -16,9 +16,11 @@ void initialize_sockets() {
 }
 
 void dec_free(SCCB* sccb){
-	sccb->refcount--;
-	if(sccb->refcount == 0)
-		free(sccb);
+	if (sccb != NULL) {
+		sccb->refcount--;
+		if(sccb->refcount == 0)
+			free(sccb);
+	}
 }
 void* socket_invalidFunction_open(){
 	return NULL;
@@ -62,7 +64,7 @@ int socket_close(void* sccb){
 	switch(my_sccb->type){
 
 		case SOCKET_UNBOUND:
-			//dec_free(my_sccb);
+			dec_free(my_sccb);
 			break;
 		case SOCKET_PEER:
 			peer_socket* peer3 = &my_sccb->peer_s;
@@ -71,14 +73,14 @@ int socket_close(void* sccb){
 				peer3->read_pipe = NULL;
 				pipe_writer_close(peer3->write_pipe);
 				peer3->write_pipe = NULL;
-			//	dec_free(my_sccb);
+				dec_free(my_sccb);
 			}	
 			break;
 		case SOCKET_LISTENER:
 			kernel_broadcast(&(my_sccb->listener_s.req_available));
 			PORT_MAP[my_sccb->port]=NULL;
+			dec_free(my_sccb);
 			my_sccb = NULL;
-			//dec_free(my_sccb);
 			break;	
 		default:
 			break;
@@ -154,7 +156,7 @@ int sys_Listen(Fid_t sock)
 	if (my_sock == NULL || my_sock->port == NOPORT)
 		return -1;
 
-	if (PORT_MAP[my_sock->port] != NULL)
+	if (PORT_MAP[my_sock->port] != NULL || my_sock->type == SOCKET_PEER)
 		return -1;
 
 	// Install the socket into PORT_MAP[]
@@ -252,18 +254,22 @@ Fid_t sys_Accept(Fid_t lsock)
 
 	my_sock3->type = SOCKET_PEER;
 	my_sock3->peer_s.peer = my_sock2;
+	my_sock3->peer_s.write_pipe = pipe1;
 	my_sock3->peer_s.write_pipe->writer = pipe1->writer;
+	my_sock3->peer_s.read_pipe = pipe2;
 	my_sock3->peer_s.read_pipe->reader = pipe2->reader;
 
 	my_sock2->type = SOCKET_PEER;
 	my_sock2->peer_s.peer = my_sock3;
+	my_sock2->peer_s.read_pipe = pipe1;
 	my_sock2->peer_s.read_pipe->reader = pipe1->reader;
+	my_sock2->peer_s.write_pipe = pipe2;
 	my_sock2->peer_s.write_pipe->writer = pipe2->writer;
 
 
 	first_request->admitted = 1;
 	kernel_signal(&(first_request->connected_cv));
-	//dec_free(my_sock);
+	dec_free(my_sock);
 
 	return my_sock_fid3;
 }
@@ -322,7 +328,7 @@ int sys_Connect(Fid_t sock, port_t port, timeout_t timeout)
 		if(!i)
 			break;
 	}
-	//dec_free(sccb);
+	dec_free(sccb);
 	if(sccb->type == SOCKET_PEER){
 		return 0;
 	}
