@@ -43,6 +43,7 @@ int socket_write(void* sccb , const char *buf , unsigned int n){
 	return -1;
 }
 int socket_close(void* sccb){
+	// If a listener is being closed => kernel_broadcast to Accept
 	if(sccb!= NULL){
 		SCCB* my_sccb = (SCCB*)sccb;
 		
@@ -59,6 +60,11 @@ int socket_close(void* sccb){
 				}
 			}
 		}
+
+		//GIATI DEN DOULEUEI???
+		// if (my_sccb->type == SOCKET_LISTENER)
+		// 		kernel_broadcast(&my_sccb->listener_s.req_available);
+
 		if(my_sccb->refcount == 0){
 			PORT_MAP[my_sccb->port]=NULL;
 			//my_fcb->streamobj = NULL;
@@ -133,18 +139,13 @@ int sys_Listen(Fid_t sock)
 Fid_t sys_Accept(Fid_t lsock)
 {
 	// ---------- ELEGXOI ----------
-	if(lsock == NOFILE)
+	if(lsock <= NOFILE || lsock >= MAX_FILEID)
 		return -1;
 	
 	FCB* fcb_of_sock = get_fcb(lsock);
 
 	if (fcb_of_sock == NULL)
 		return -1;
-
-	// How do i check if FID is illegal or is not initialized?
-
-	if (CURPROC->FIDT[15] != NULL) // Checking if process has no other available FIDs
-		return NOFILE;
 	
 	SCCB* my_sock = (SCCB*) fcb_of_sock->streamobj;
 
@@ -160,20 +161,18 @@ Fid_t sys_Accept(Fid_t lsock)
 	}
 	//my_sock->refcount--;
 	// Check if port is still valid
-	if (my_sock->port == NOPORT)
+	if (PORT_MAP[my_sock->port] == NULL)
 		return NOFILE;
 	
 	// Honor first request of queue
-	connection_request* first_request = (connection_request*) rlist_pop_front(&my_sock->listener_s.queue);
+	connection_request* first_request = (connection_request*) rlist_pop_front(&my_sock->listener_s.queue)->obj;  //Mhpws de ginetai swsta to casting??
 	if(first_request == NULL)
 		return NOFILE;
-	
 
 	// Try to construct peer    APO POU PAIRNO TA PPCB KAI AN TO KANO SOSTA
 	//my_sock->type = SOCKET_PEER;
-	SCCB* my_sock2 = first_request->peer; //s2
-	peer_socket* peer_of_sock2 = (peer_socket*)my_sock2;
-	
+	SCCB* my_sock2 = first_request->peer; //s2	
+	my_sock2->type = SOCKET_PEER;
 	
 	Fid_t my_sock_fid3 = sys_Socket(my_sock->port); //s3 ///edo ti ginetai charge9
 	if(my_sock_fid3 == NOFILE)
@@ -186,23 +185,23 @@ Fid_t sys_Accept(Fid_t lsock)
 	if(my_sock3 == NULL)
 		return NOFILE;
 	my_sock3->type = SOCKET_PEER;
-	peer_socket* peer_of_sock3 = (peer_socket*)my_sock3;
 
 	// Ftiaxno PPCB* me xmalloc
-	PPCB* pipe1 = xmalloc(sizeof(PPCB));
-	PPCB* pipe2 = xmalloc(sizeof(PPCB));
+	PPCB* pipe1 = (PPCB*)xmalloc(sizeof(PPCB));
+	PPCB* pipe2 = (PPCB*)xmalloc(sizeof(PPCB));
 	
 	//pipe initialization 
 
 	// Ftiaxno ta peer to peer
-	peer_of_sock2->read_pipe = pipe1;
-	peer_of_sock3->write_pipe = pipe1;
+	my_sock2->peer_s.peer = my_sock3;
+	my_sock3->peer_s.peer = my_sock2;
 
-	peer_of_sock2->write_pipe = pipe2;
-	peer_of_sock3->read_pipe = pipe2;
+	my_sock2->peer_s.read_pipe->reader = pipe1->reader;
+	my_sock3->peer_s.read_pipe->reader = pipe2->reader;
 
-	peer_of_sock2->peer = my_sock3;
-	peer_of_sock3->peer = my_sock2;
+	my_sock2->peer_s.write_pipe->writer = pipe2->writer;
+	my_sock3->peer_s.write_pipe->writer = pipe1->writer;
+
 	first_request->admitted = 1;
 	kernel_signal(&(first_request->connected_cv));
 	my_sock->refcount--;
@@ -217,7 +216,7 @@ int sys_Connect(Fid_t sock, port_t port, timeout_t timeout)
 	// }
 
 	if(sock == NOFILE){
-		retrun -1;
+		return -1;
 	}
 	FCB * my_sock = get_fcb(sock);
 
@@ -259,7 +258,7 @@ int sys_Connect(Fid_t sock, port_t port, timeout_t timeout)
 	kernel_signal(&(is_listener->listener_s.req_available));
 
 	while(con_req ->admitted == 0 ){
-		kernel_timedwait(&(con_req->connected_cv),SCHED_USER,timeout);
+		kernel_timedwait(&(con_req->connected_cv),SCHED_USER,timeout*1000);
 	}
 	if(con_req->admitted==1){
 		is_listener->refcount--;
