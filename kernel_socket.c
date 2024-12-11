@@ -156,7 +156,7 @@ int sys_Listen(Fid_t sock)
 	if (my_sock == NULL || my_sock->port == NOPORT)
 		return -1;
 
-	if (PORT_MAP[my_sock->port] != NULL || my_sock->type == SOCKET_PEER)
+	if (PORT_MAP[my_sock->port] != NULL || my_sock->type != SOCKET_UNBOUND)
 		return -1;
 
 	// Install the socket into PORT_MAP[]
