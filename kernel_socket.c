@@ -127,7 +127,7 @@ Fid_t sys_Socket(port_t port)
 		if(FCB_reserve(1,&fid,&fcb)){
 			SCCB* sccb;
 			sccb = (SCCB*)xmalloc(sizeof(SCCB));
-			sccb->refcount = 0;
+			sccb->refcount = 1;
 			sccb->type = SOCKET_UNBOUND; //unbound
 			if(port>NOPORT)
 				sccb->port = port;
@@ -308,8 +308,8 @@ int sys_Connect(Fid_t sock, port_t port, timeout_t timeout)
 	if(!(sccb->type == SOCKET_UNBOUND))
 		return -1;
 
-	is_listener->refcount++;
-
+	//is_listener->refcount++;
+	sccb->refcount++;
 	connection_request* con_req = (connection_request*)xmalloc(sizeof(connection_request));
 
 	con_req -> admitted = 0;
